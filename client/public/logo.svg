@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!-- Dynamic Filter for Shadow -->
+  <defs>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="4"/>
+      <feOffset dx="2" dy="4" result="offsetblur"/>
+      <feFlood flood-color="#000000" flood-opacity="0.3"/>
+      <feComposite in2="offsetblur" operator="in"/>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Detailed Shield -->
+  <path d="M256 32 
+           C 140 32, 64 90, 64 180 
+           V 280 
+           C 64 390, 150 470, 256 502 
+           C 362 470, 448 390, 448 280 
+           V 180 
+           C 448 90, 372 32, 256 32 Z" 
+        fill="#002147"/>
+
+  <!-- Left "F" -->
+  <path d="M120 140 H 220 V 180 H 160 V 220 H 210 V 260 H 160 V 360 H 120 V 140" fill="#F7E9D5"/>
+  
+  <!-- Right "F" -->
+  <path d="M246 140 H 346 V 180 H 286 V 220 H 336 V 260 H 286 V 360 H 246 V 140" fill="#F7E9D5"/>
+
+  <!-- Motion Swoosh (Road) -->
+  <path d="M 50 420 
+           Q 150 380, 256 260 
+           Q 340 160, 460 140 
+           L 440 200 
+           Q 340 220, 256 320 
+           Q 150 440, 50 460 Z" 
+        fill="#D2B48C" 
+        filter="url(#shadow)"/>
+        
+  <!-- Arrow Accent -->
+  <path d="M 460 140 L 485 130 L 500 190 L 440 200 Z" fill="#D2B48C"/>
+
+</svg>
