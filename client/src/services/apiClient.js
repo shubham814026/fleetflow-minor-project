@@ -38,7 +38,12 @@ apiClient.interceptors.request.use(
 
 // Response interceptor for unified error formatting and token expiration
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    if (response.data && response.data.success !== undefined && response.data.data !== undefined) {
+      return { ...response, data: response.data.data };
+    }
+    return response;
+  },
   (error) => {
     const status = error.response ? error.response.status : null;
 

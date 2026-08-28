@@ -24,7 +24,8 @@ export const authApi = {
   login: async (email, password, role = 'Super Admin') => {
     try {
       const res = await apiClient.post('/auth/login', { email, password, role });
-      return res.data;
+      const payload = res.data?.data || res.data;
+      return payload;
     } catch (e) {
       await delay();
       const userObj = {

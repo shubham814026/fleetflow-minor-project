@@ -20,13 +20,13 @@ export default function LoginPage() {
 
     try {
       const user = await login(email, password, role);
-      if (user.role === 'Driver') {
+      if (user && (user.role === 'Driver' || user.role === 'DRIVER')) {
         navigate('/driver/dashboard');
       } else {
         navigate('/dashboard');
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Login failed. Please check your credentials.');
+      setError(err.response?.data?.error?.message || err.response?.data?.message || err.message || 'Login failed. Please check your credentials.');
     } finally {
       setLoading(false);
     }

@@ -37,12 +37,12 @@ export default function DashboardPage() {
           forecastApi.getDemand()
         ]);
 
-        setVehicles(vData);
-        setDrivers(dData);
-        setTrips(tData);
-        setAlerts(aData);
-        setFuelMetrics(fData);
-        setForecast(fcData);
+        setVehicles(Array.isArray(vData) ? vData : (vData?.data || []));
+        setDrivers(Array.isArray(dData) ? dData : (dData?.data || []));
+        setTrips(Array.isArray(tData) ? tData : (tData?.data || []));
+        setAlerts(Array.isArray(aData) ? aData : (aData?.data || []));
+        setFuelMetrics(fData?.data || fData);
+        setForecast(fcData?.data || fcData);
       } catch (err) {
         console.error('Failed loading dashboard data', err);
       } finally {
@@ -70,10 +70,10 @@ export default function DashboardPage() {
     };
   }, []);
 
-  const activeVehicles = vehicles.filter((v) => v.status === 'moving' || v.status === 'idle').length;
-  const offlineVehicles = vehicles.filter((v) => v.status === 'offline').length;
-  const activeDrivers = drivers.filter((d) => d.status === 'Active').length;
-  const openAlerts = alerts.filter((a) => a.status === 'Open').length;
+  const activeVehicles = (Array.isArray(vehicles) ? vehicles : []).filter((v) => v.status === 'moving' || v.status === 'idle').length;
+  const offlineVehicles = (Array.isArray(vehicles) ? vehicles : []).filter((v) => v.status === 'offline').length;
+  const activeDrivers = (Array.isArray(drivers) ? drivers : []).filter((d) => d.status === 'Active').length;
+  const openAlerts = (Array.isArray(alerts) ? alerts : []).filter((a) => a.status === 'Open').length;
 
   if (loading) {
     return (
