@@ -29,6 +29,13 @@ export default function MaintenancePage() {
           </h1>
           <p className="text-xs text-slate-400 mt-1">Odometer threshold tracking & scheduled maintenance due dates</p>
         </div>
+
+        <a
+          href="/maintenance/create"
+          className="px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-amber-500/20 transition-all self-start md:self-auto"
+        >
+          <Plus className="w-4 h-4" /> Log Service Record
+        </a>
       </div>
 
       <div className="bg-slate-900/90 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">

@@ -1,7 +1,7 @@
-import { INITIAL_TRIPS } from '../../../client/src/api/mockData.js';
+import { TRIPS } from './tripController.js';
 
 export const getLogbookReport = async (req, res) => {
-  return res.json({ success: true, data: INITIAL_TRIPS });
+  return res.json({ success: true, data: TRIPS });
 };
 
 export const exportLogbookPDF = async (req, res) => {

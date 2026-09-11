@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Fuel, TrendingUp, DollarSign, Lightbulb, AlertTriangle, ArrowUpRight } from 'lucide-react';
+import { Fuel, TrendingUp, DollarSign, Lightbulb, AlertTriangle, ArrowUpRight, Plus } from 'lucide-react';
 import { fuelApi } from '../api';
 
 export default function FuelPage() {
@@ -33,6 +33,13 @@ export default function FuelPage() {
           </h1>
           <p className="text-xs text-slate-400 mt-1">Fleet consumption, cost per km, mileage comparisons & backend insights</p>
         </div>
+
+        <a
+          href="/fuel/create"
+          className="px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-amber-500/20 transition-all self-start md:self-auto"
+        >
+          <Plus className="w-4 h-4" /> Log Fuel Entry
+        </a>
       </div>
 
       {/* KPI Cards */}

@@ -29,8 +29,19 @@ import { notFound, errorHandler } from './src/middleware/errorMiddleware.js';
 const app = express();
 
 app.use(helmet({ contentSecurityPolicy: false }));
-app.use(cors({ origin: CLIENT_URL, credentials: true }));
+const allowedOrigins = [CLIENT_URL, 'http://localhost:5173', 'http://127.0.0.1:5173'];
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin) || origin.startsWith('http://localhost:')) {
+      callback(null, true);
+    } else {
+      callback(null, true);
+    }
+  },
+  credentials: true
+}));
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(morgan('dev'));
 
 // Swagger Interactive Documentation

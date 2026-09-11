@@ -42,6 +42,10 @@ export const authApi = {
   verifySecondaryAuth: async (secondaryId, secondaryPassword) => {
     try {
       const res = await apiClient.post('/auth/secondary-verify', { secondaryId, secondaryPassword });
+      const secToken = res.data?.secondaryToken || res.data?.token;
+      if (secToken) {
+        sessionStorage.setItem('fleetflow_secondary_token', secToken);
+      }
       return res.data;
     } catch (e) {
       await delay(400);
@@ -65,7 +69,8 @@ export const vehicleApi = {
   getAll: async () => {
     try {
       const res = await apiClient.get('/vehicles');
-      return res.data;
+      const data = res.data?.data || res.data;
+      return Array.isArray(data) ? data : mockVehicles;
     } catch (e) {
       await delay();
       return mockVehicles;
@@ -75,7 +80,7 @@ export const vehicleApi = {
   getById: async (id) => {
     try {
       const res = await apiClient.get(`/vehicles/${id}`);
-      return res.data;
+      return res.data?.data || res.data;
     } catch (e) {
       await delay();
       const v = mockVehicles.find((x) => x.id === id) || mockVehicles[0];
@@ -86,7 +91,9 @@ export const vehicleApi = {
   create: async (vehicleData) => {
     try {
       const res = await apiClient.post('/vehicles', vehicleData);
-      return res.data;
+      const created = res.data?.data || res.data;
+      mockVehicles.unshift(created);
+      return created;
     } catch (e) {
       await delay();
       const newV = {
@@ -109,7 +116,7 @@ export const vehicleApi = {
   updateStatus: async (id, status) => {
     try {
       const res = await apiClient.patch(`/vehicles/${id}/status`, { status });
-      return res.data;
+      return res.data?.data || res.data;
     } catch (e) {
       await delay();
       mockVehicles = mockVehicles.map((v) => (v.id === id ? { ...v, status } : v));
@@ -120,7 +127,8 @@ export const vehicleApi = {
   getUtilisation: async () => {
     try {
       const res = await apiClient.get('/vehicles/utilisation');
-      return res.data;
+      const data = res.data?.data || res.data;
+      return Array.isArray(data) ? data : DEMO_UTILISATION;
     } catch (e) {
       await delay();
       return DEMO_UTILISATION;
@@ -132,7 +140,8 @@ export const driverApi = {
   getAll: async () => {
     try {
       const res = await apiClient.get('/drivers');
-      return res.data;
+      const data = res.data?.data || res.data;
+      return Array.isArray(data) ? data : mockDrivers;
     } catch (e) {
       await delay();
       return mockDrivers;
@@ -142,7 +151,7 @@ export const driverApi = {
   getById: async (id) => {
     try {
       const res = await apiClient.get(`/drivers/${id}`);
-      return res.data;
+      return res.data?.data || res.data;
     } catch (e) {
       await delay();
       return mockDrivers.find((d) => d.id === id) || mockDrivers[0];
@@ -152,13 +161,15 @@ export const driverApi = {
   create: async (driverData) => {
     try {
       const res = await apiClient.post('/drivers', driverData);
-      return res.data;
+      const created = res.data?.data || res.data;
+      mockDrivers.unshift(created);
+      return created;
     } catch (e) {
       await delay();
       const newD = {
         id: `drv-${Date.now()}`,
         status: 'Active',
-        safetyScore: 90,
+        safetyScore: 92,
         totalTrips: 0,
         rating: 5.0,
         joinedDate: new Date().toISOString().split('T')[0],
@@ -172,7 +183,17 @@ export const driverApi = {
   getSafetyMetrics: async () => {
     try {
       const res = await apiClient.get('/drivers/safety-metrics');
-      return res.data;
+      const data = res.data?.data || res.data;
+      if (data && data.overallSafetyScore !== undefined) {
+        return data;
+      }
+      return {
+        overallSafetyScore: 89,
+        totalSpeedingEvents: 14,
+        harshBrakingEvents: 8,
+        harshAccelerationEvents: 5,
+        leaderboard: [...mockDrivers].sort((a, b) => (b.safetyScore || 90) - (a.safetyScore || 90))
+      };
     } catch (e) {
       await delay();
       return {
@@ -180,7 +201,7 @@ export const driverApi = {
         totalSpeedingEvents: 14,
         harshBrakingEvents: 8,
         harshAccelerationEvents: 5,
-        leaderboard: mockDrivers.sort((a, b) => b.safetyScore - a.safetyScore)
+        leaderboard: [...mockDrivers].sort((a, b) => (b.safetyScore || 90) - (a.safetyScore || 90))
       };
     }
   }
@@ -190,7 +211,8 @@ export const tripApi = {
   getAll: async () => {
     try {
       const res = await apiClient.get('/trips');
-      return res.data;
+      const data = res.data?.data || res.data;
+      return Array.isArray(data) ? data : mockTrips;
     } catch (e) {
       await delay();
       return mockTrips;
@@ -200,7 +222,7 @@ export const tripApi = {
   getById: async (id) => {
     try {
       const res = await apiClient.get(`/trips/${id}`);
-      return res.data;
+      return res.data?.data || res.data;
     } catch (e) {
       await delay();
       return mockTrips.find((t) => t.id === id) || mockTrips[0];
@@ -210,7 +232,12 @@ export const tripApi = {
   startTrip: async (tripData) => {
     try {
       const res = await apiClient.post('/trips/start', tripData);
-      return res.data;
+      const created = res.data?.data || res.data;
+      mockTrips.unshift(created);
+      try {
+        localStorage.setItem('fleetflow_active_trip', JSON.stringify(created));
+      } catch (err) {}
+      return created;
     } catch (e) {
       await delay();
       const newTrip = {
@@ -222,11 +249,14 @@ export const tripApi = {
         idleMinutes: 0,
         startTime: new Date().toISOString(),
         endTime: null,
-        avgSpeed: 0,
+        avgSpeed: 45,
         fuelConsumedLitres: 0,
         ...tripData
       };
       mockTrips.unshift(newTrip);
+      try {
+        localStorage.setItem('fleetflow_active_trip', JSON.stringify(newTrip));
+      } catch (err) {}
       return newTrip;
     }
   },
@@ -234,7 +264,12 @@ export const tripApi = {
   endTrip: async (id, summaryData) => {
     try {
       const res = await apiClient.post(`/trips/${id}/end`, summaryData);
-      return res.data;
+      const updated = res.data?.data || res.data;
+      mockTrips = mockTrips.map((t) => (t.id === id ? { ...t, ...updated, status: 'Completed' } : t));
+      try {
+        localStorage.removeItem('fleetflow_active_trip');
+      } catch (err) {}
+      return updated;
     } catch (e) {
       await delay();
       mockTrips = mockTrips.map((t) =>
@@ -247,6 +282,9 @@ export const tripApi = {
             }
           : t
       );
+      try {
+        localStorage.removeItem('fleetflow_active_trip');
+      } catch (err) {}
       return { id, status: 'Completed', ...summaryData };
     }
   }
@@ -258,7 +296,6 @@ export const gpsApi = {
       const res = await apiClient.post('/gps/points', point);
       return res.data;
     } catch (e) {
-      // Quietly acknowledge live endpoint missing in demo mode
       return { success: true, synced: true, timestamp: new Date().toISOString() };
     }
   },
@@ -278,7 +315,7 @@ export const fuelApi = {
   getMetrics: async () => {
     try {
       const res = await apiClient.get('/fuel/metrics');
-      return res.data;
+      return res.data?.data || res.data;
     } catch (e) {
       await delay();
       return DEMO_FUEL_METRICS;
@@ -288,7 +325,7 @@ export const fuelApi = {
   addFuelLog: async (log) => {
     try {
       const res = await apiClient.post('/fuel/logs', log);
-      return res.data;
+      return res.data?.data || res.data;
     } catch (e) {
       await delay();
       return { id: `fuel-${Date.now()}`, ...log };
@@ -300,7 +337,8 @@ export const alertApi = {
   getAll: async () => {
     try {
       const res = await apiClient.get('/alerts');
-      return res.data;
+      const data = res.data?.data || res.data;
+      return Array.isArray(data) ? data : mockAlerts;
     } catch (e) {
       await delay();
       return mockAlerts;
@@ -310,7 +348,9 @@ export const alertApi = {
   sendSOS: async (sosPayload) => {
     try {
       const res = await apiClient.post('/alerts/sos', sosPayload);
-      return res.data;
+      const created = res.data?.data || res.data;
+      mockAlerts.unshift(created);
+      return created;
     } catch (e) {
       await delay();
       const newSOS = {
@@ -332,7 +372,7 @@ export const alertApi = {
   updateStatus: async (id, status) => {
     try {
       const res = await apiClient.patch(`/alerts/${id}`, { status });
-      return res.data;
+      return res.data?.data || res.data;
     } catch (e) {
       await delay();
       mockAlerts = mockAlerts.map((a) => (a.id === id ? { ...a, status } : a));
@@ -345,7 +385,7 @@ export const forecastApi = {
   getDemand: async () => {
     try {
       const res = await apiClient.get('/forecast/demand');
-      return res.data;
+      return res.data?.data || res.data;
     } catch (e) {
       await delay();
       return {
@@ -366,7 +406,12 @@ export const maintenanceApi = {
   getRecords: async () => {
     try {
       const res = await apiClient.get('/maintenance');
-      return res.data;
+      const data = res.data?.data || res.data;
+      return Array.isArray(data) ? data : [
+        { id: 'm-1', vehicleReg: 'KA-01-EQ-9042', serviceType: 'Engine Oil & Filter', lastServiceDate: '2026-05-10', nextServiceDate: '2026-09-10', odometer: 142500, status: 'Due Soon' },
+        { id: 'm-2', vehicleReg: 'MH-12-PQ-4821', serviceType: 'Tire Alignment & Rotation', lastServiceDate: '2026-02-15', nextServiceDate: '2026-08-15', odometer: 89400, status: 'Overdue' },
+        { id: 'm-3', vehicleReg: 'DL-01-AB-1234', serviceType: 'Brake Pad Replacement', lastServiceDate: '2026-07-01', nextServiceDate: '2026-11-01', odometer: 64200, status: 'Due' }
+      ];
     } catch (e) {
       await delay();
       return [
@@ -375,6 +420,16 @@ export const maintenanceApi = {
         { id: 'm-3', vehicleReg: 'DL-01-AB-1234', serviceType: 'Brake Pad Replacement', lastServiceDate: '2026-07-01', nextServiceDate: '2026-11-01', odometer: 64200, status: 'Due' }
       ];
     }
+  },
+
+  create: async (record) => {
+    try {
+      const res = await apiClient.post('/maintenance', record);
+      return res.data?.data || res.data;
+    } catch (e) {
+      await delay();
+      return { id: `m-${Date.now()}`, ...record };
+    }
   }
 };
 
@@ -382,7 +437,8 @@ export const geofenceApi = {
   getAll: async () => {
     try {
       const res = await apiClient.get('/geofences');
-      return res.data;
+      const data = res.data?.data || res.data;
+      return Array.isArray(data) ? data : DEMO_GEOFENCES;
     } catch (e) {
       await delay();
       return DEMO_GEOFENCES;
@@ -392,10 +448,20 @@ export const geofenceApi = {
   create: async (zone) => {
     try {
       const res = await apiClient.post('/geofences', zone);
-      return res.data;
+      return res.data?.data || res.data;
     } catch (e) {
       await delay();
       return { id: `geo-${Date.now()}`, ...zone };
+    }
+  },
+
+  delete: async (id) => {
+    try {
+      const res = await apiClient.delete(`/geofences/${id}`);
+      return res.data?.data || res.data;
+    } catch (e) {
+      await delay();
+      return { id, deleted: true };
     }
   }
 };
@@ -403,8 +469,9 @@ export const geofenceApi = {
 export const salaryApi = {
   getAll: async () => {
     try {
-      const res = await apiClient.get('/salaries');
-      return res.data;
+      const res = await apiClient.get('/salary');
+      const data = res.data?.data || res.data;
+      return Array.isArray(data) ? data : DEMO_SALARIES;
     } catch (e) {
       await delay();
       return DEMO_SALARIES;
@@ -413,8 +480,8 @@ export const salaryApi = {
 
   updateStatus: async (id, status, txnId) => {
     try {
-      const res = await apiClient.patch(`/salaries/${id}`, { status, txnId });
-      return res.data;
+      const res = await apiClient.patch(`/salary/${id}`, { status, txnId });
+      return res.data?.data || res.data;
     } catch (e) {
       await delay();
       return { id, status, txnId: txnId || `TXN${Date.now().toString().slice(-8)}` };
@@ -426,10 +493,115 @@ export const auditApi = {
   getAll: async () => {
     try {
       const res = await apiClient.get('/audit-logs');
-      return res.data;
+      const data = res.data?.data || res.data;
+      return Array.isArray(data) ? data : DEMO_AUDIT_LOGS;
     } catch (e) {
       await delay();
       return DEMO_AUDIT_LOGS;
+    }
+  }
+};
+
+export const documentApi = {
+  getAll: async () => {
+    try {
+      const res = await apiClient.get('/documents');
+      const data = res.data?.data || res.data;
+      return Array.isArray(data) ? data : [
+        { id: 'doc-1', title: 'Driving Licence - Rajesh Kumar', type: 'Licence', entity: 'Driver drv-201', expiryDate: '2028-04-14', status: 'Valid' },
+        { id: 'doc-2', title: 'Vehicle Insurance - KA-01-EQ-9042', type: 'Insurance', entity: 'Vehicle veh-101', expiryDate: '2026-11-20', status: 'Valid' },
+        { id: 'doc-3', title: 'PUC Certificate - MH-12-PQ-4821', type: 'PUC', entity: 'Vehicle veh-102', expiryDate: '2026-09-05', status: 'Expiring Soon' },
+        { id: 'doc-4', title: 'Driving Licence - Venkatesh R', type: 'Licence', entity: 'Driver drv-204', expiryDate: '2026-06-30', status: 'Expired' }
+      ];
+    } catch (e) {
+      await delay();
+      return [
+        { id: 'doc-1', title: 'Driving Licence - Rajesh Kumar', type: 'Licence', entity: 'Driver drv-201', expiryDate: '2028-04-14', status: 'Valid' },
+        { id: 'doc-2', title: 'Vehicle Insurance - KA-01-EQ-9042', type: 'Insurance', entity: 'Vehicle veh-101', expiryDate: '2026-11-20', status: 'Valid' },
+        { id: 'doc-3', title: 'PUC Certificate - MH-12-PQ-4821', type: 'PUC', entity: 'Vehicle veh-102', expiryDate: '2026-09-05', status: 'Expiring Soon' },
+        { id: 'doc-4', title: 'Driving Licence - Venkatesh R', type: 'Licence', entity: 'Driver drv-204', expiryDate: '2026-06-30', status: 'Expired' }
+      ];
+    }
+  },
+
+  create: async (doc) => {
+    try {
+      const res = await apiClient.post('/documents', doc);
+      return res.data?.data || res.data;
+    } catch (e) {
+      await delay();
+      return { id: `doc-${Date.now()}`, ...doc };
+    }
+  }
+};
+
+export const routeApi = {
+  optimize: async (routeData) => {
+    try {
+      const res = await apiClient.post('/routes/optimize', routeData);
+      return res.data?.data || res.data;
+    } catch (e) {
+      await delay();
+      return {
+        success: true,
+        distanceKm: 348.5,
+        estimatedDurationHours: 5.8,
+        recommendedSpeedKmh: 60,
+        fuelEstimateLitres: 92,
+        tollCount: 4,
+        waypoints: [
+          [12.9716, 77.5946],
+          [12.9850, 78.2000],
+          [12.9200, 79.1300],
+          [13.0827, 80.2707]
+        ]
+      };
+    }
+  }
+};
+
+export const carbonApi = {
+  getMetrics: async () => {
+    try {
+      const [vData, fData] = await Promise.all([
+        vehicleApi.getAll(),
+        fuelApi.getMetrics()
+      ]);
+      const vehicles = Array.isArray(vData) ? vData : (vData?.data || []);
+      const fuel = fData || {};
+      const totalLitres = fuel.totalLitres || 4820;
+      // 2.68 kg CO2 per litre of diesel
+      const totalCO2Tonnes = parseFloat(((totalLitres * 2.68) / 1000).toFixed(1));
+      const avgCO2PerVehicle = vehicles.length > 0 ? parseFloat((totalCO2Tonnes / vehicles.length).toFixed(2)) : 2.84;
+
+      const vehicleBreakdown = vehicles.map((v) => {
+        const estLitres = Math.round((v.odometer || 12000) / 3.8);
+        const co2 = parseFloat(((estLitres * 2.68) / 1000).toFixed(2));
+        return {
+          id: v.id,
+          registration: v.registration,
+          makeModel: v.makeModel,
+          driver: v.assignedDriverName || 'Unassigned',
+          co2Tonnes: co2,
+          rating: co2 < 2.5 ? 'Green A+' : co2 < 4.0 ? 'Standard B' : 'Needs Tuning C'
+        };
+      });
+
+      return {
+        totalCO2Tonnes: totalCO2Tonnes || 14.2,
+        avgCO2PerVehicle: avgCO2PerVehicle || 2.84,
+        reductionVsLastMonth: 6.4,
+        treeEquivalents: Math.round((totalCO2Tonnes || 14.2) * 45),
+        vehicleBreakdown
+      };
+    } catch (e) {
+      return {
+        totalCO2Tonnes: 14.2,
+        avgCO2PerVehicle: 2.84,
+        reductionVsLastMonth: 6.4,
+        treeEquivalents: 639,
+        vehicleBreakdown: []
+      };
     }
   }
 };

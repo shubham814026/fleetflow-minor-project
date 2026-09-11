@@ -14,17 +14,22 @@ const DriverLoginPage = lazy(() => import('./pages/driver/DriverLoginPage'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const LiveMapPage = lazy(() => import('./pages/LiveMapPage'));
 const VehiclesPage = lazy(() => import('./pages/VehiclesPage'));
+const VehicleCreatePage = lazy(() => import('./pages/VehicleCreatePage'));
 const VehicleDetailPage = lazy(() => import('./pages/VehicleDetailPage'));
 const DriversPage = lazy(() => import('./pages/DriversPage'));
+const DriverCreatePage = lazy(() => import('./pages/DriverCreatePage'));
 const DriverDetailPage = lazy(() => import('./pages/DriverDetailPage'));
 const TripsPage = lazy(() => import('./pages/TripsPage'));
+const TripCreatePage = lazy(() => import('./pages/TripCreatePage'));
 const TripDetailPage = lazy(() => import('./pages/TripDetailPage'));
 const FuelPage = lazy(() => import('./pages/FuelPage'));
+const FuelCreatePage = lazy(() => import('./pages/FuelCreatePage'));
 const UtilisationPage = lazy(() => import('./pages/UtilisationPage'));
 const AlertsPage = lazy(() => import('./pages/AlertsPage'));
 const ForecastPage = lazy(() => import('./pages/ForecastPage'));
 const GeofencingPage = lazy(() => import('./pages/GeofencingPage'));
 const MaintenancePage = lazy(() => import('./pages/MaintenancePage'));
+const MaintenanceCreatePage = lazy(() => import('./pages/MaintenanceCreatePage'));
 const SafetyPage = lazy(() => import('./pages/SafetyPage'));
 const RoutesPage = lazy(() => import('./pages/RoutesPage'));
 const DocumentsPage = lazy(() => import('./pages/DocumentsPage'));
@@ -33,6 +38,7 @@ const CarbonPage = lazy(() => import('./pages/CarbonPage'));
 const ReportsPage = lazy(() => import('./pages/ReportsPage'));
 const SalaryPage = lazy(() => import('./pages/SalaryPage'));
 const AuditLogsPage = lazy(() => import('./pages/AuditLogsPage'));
+const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 
@@ -59,12 +65,16 @@ const App = () => {
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/live-map" element={<LiveMapPage />} />
             <Route path="/vehicles" element={<VehiclesPage />} />
+            <Route path="/vehicles/create" element={<VehicleCreatePage />} />
             <Route path="/vehicles/:id" element={<VehicleDetailPage />} />
             <Route path="/drivers" element={<DriversPage />} />
+            <Route path="/drivers/create" element={<DriverCreatePage />} />
             <Route path="/drivers/:id" element={<DriverDetailPage />} />
             <Route path="/trips" element={<TripsPage />} />
+            <Route path="/trips/create" element={<TripCreatePage />} />
             <Route path="/trips/:id" element={<TripDetailPage />} />
             <Route path="/fuel" element={<FuelPage />} />
+            <Route path="/fuel/create" element={<FuelCreatePage />} />
             <Route path="/utilisation" element={<UtilisationPage />} />
             <Route path="/alerts" element={<AlertsPage />} />
             <Route path="/alerts/fraud" element={<AlertsPage />} />
@@ -73,6 +83,7 @@ const App = () => {
             <Route path="/forecast" element={<ForecastPage />} />
             <Route path="/geofencing" element={<GeofencingPage />} />
             <Route path="/maintenance" element={<MaintenancePage />} />
+            <Route path="/maintenance/create" element={<MaintenanceCreatePage />} />
             <Route path="/safety" element={<SafetyPage />} />
             <Route path="/routes" element={<RoutesPage />} />
             <Route path="/documents" element={<DocumentsPage />} />
@@ -81,6 +92,7 @@ const App = () => {
             <Route path="/reports" element={<ReportsPage />} />
             <Route path="/salary" element={<SalaryPage />} />
             <Route path="/audit-logs" element={<AuditLogsPage />} />
+            <Route path="/analytics" element={<AnalyticsPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/profile" element={<ProfilePage />} />
           </Route>

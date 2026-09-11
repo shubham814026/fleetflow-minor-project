@@ -31,6 +31,20 @@ let USERS = [
     name: 'Accountant HR User',
     passwordHash: bcrypt.hashSync('password123', 10),
     role: 'ACCOUNTANT'
+  },
+  {
+    id: 'usr-105',
+    email: 'admin@fleetflow.com',
+    name: 'Fleet Admin',
+    passwordHash: bcrypt.hashSync('admin123', 10),
+    role: 'SUPER_ADMIN'
+  },
+  {
+    id: 'drv-202',
+    email: 'driver@fleetflow.com',
+    name: 'Rajesh Kumar',
+    passwordHash: bcrypt.hashSync('driver123', 10),
+    role: 'DRIVER'
   }
 ];
 
@@ -45,7 +59,7 @@ let SECONDARY_CREDENTIALS = {
 let AUDIT_LOGS = [];
 
 export const login = async (req, res) => {
-  const { email, password, role } = req.body;
+  const { email, password, role } = req.body || {};
   if (!email || !password) {
     return res.status(422).json({
       success: false,
@@ -82,7 +96,7 @@ export const login = async (req, res) => {
 };
 
 export const verifySecondaryAuth = async (req, res) => {
-  const { secondaryId, secondaryPassword, targetType, targetId } = req.body;
+  const { secondaryId, secondaryPassword, targetType, targetId } = req.body || {};
   if (!secondaryId || !secondaryPassword) {
     return res.status(422).json({
       success: false,

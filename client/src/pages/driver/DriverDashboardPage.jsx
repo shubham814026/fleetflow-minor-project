@@ -15,6 +15,19 @@ export default function DriverDashboardPage() {
   const navigate = useNavigate();
   const assignedVehicleReg = 'KA-01-EQ-9042';
 
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('fleetflow_active_trip');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.status === 'In Transit') {
+          setActiveTrip(parsed);
+          setGpsStatus('Tracking Active');
+        }
+      }
+    } catch (e) {}
+  }, []);
+
   const handleStartTripClick = async () => {
     setShowConfirmStart(true);
   };

@@ -9,5 +9,6 @@ router.post('/login', primaryLoginLimiter, login);
 router.post('/logout', logout);
 router.get('/me', authMiddleware, getMe);
 router.post('/secondary/verify', [authMiddleware, secondaryAuthLimiter], verifySecondaryAuth);
+router.post('/secondary-verify', [authMiddleware, secondaryAuthLimiter], verifySecondaryAuth);
 
 export default router;
