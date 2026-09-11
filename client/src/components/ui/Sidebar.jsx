@@ -7,9 +7,9 @@ import { ShieldCheck } from 'lucide-react';
 const Sidebar = ({ items, collapsed, onToggle }) => {
   return (
     <motion.aside
-      animate={{ width: collapsed ? 80 : 256 }}
+      animate={{ width: collapsed ? 76 : 260 }}
       transition={{ duration: 0.2, ease: 'easeInOut' }}
-      className="sticky top-4 h-[calc(100vh-2rem)] flex flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/90 p-3 shadow-2xl backdrop-blur-xl z-30 shrink-0"
+      className="sticky top-0 h-screen flex flex-col overflow-hidden border-r border-slate-800 bg-slate-900/95 p-3.5 shadow-2xl backdrop-blur-xl z-30 shrink-0"
     >
       {/* Sidebar Header / Logo */}
       <div className="flex items-center justify-between gap-2 mb-3 pb-3 border-b border-slate-800 shrink-0">
@@ -36,7 +36,7 @@ const Sidebar = ({ items, collapsed, onToggle }) => {
       </div>
 
       {/* Nav List */}
-      <nav className="flex-1 space-y-1 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
+      <nav className="flex-1 space-y-1 overflow-y-auto no-scrollbar">
         {items.map((item) => (
           <NavLink
             key={item.to}

@@ -29,7 +29,6 @@ import Sidebar from '../components/ui/Sidebar';
 import Navbar from '../components/ui/Navbar';
 import OfflineBanner from '../components/OfflineBanner';
 import { useAuth } from '../context/AuthContext';
-import { useTheme } from '../hooks/useTheme';
 
 export const ADMIN_NAV_ITEMS = [
   { to: '/dashboard', label: 'Overview', icon: LayoutDashboard },
@@ -58,7 +57,6 @@ export const ADMIN_NAV_ITEMS = [
 const AppLayout = () => {
   const location = useLocation();
   const { user, logout } = useAuth();
-  const { isDark, toggleTheme } = useTheme();
   const [collapsed, setCollapsed] = useState(false);
 
   // If driver tries to access admin layout, redirect to driver PWA dashboard
@@ -67,32 +65,32 @@ const AppLayout = () => {
   }
 
   return (
-    <div className="relative min-h-screen overflow-x-hidden bg-slate-950 text-slate-100 selection:bg-amber-500 selection:text-slate-950 font-sans">
+    <div className="relative min-h-screen overflow-x-hidden bg-slate-950 text-slate-100 selection:bg-amber-500 selection:text-slate-950 font-sans flex">
       <OfflineBanner />
       
       {/* Background Decorative Glows */}
       <div className="pointer-events-none fixed -top-40 -left-40 h-96 w-96 rounded-full bg-amber-500/10 blur-[120px]" />
       <div className="pointer-events-none fixed top-1/2 -right-40 h-96 w-96 rounded-full bg-indigo-500/10 blur-[120px]" />
 
-      <div className="relative mx-auto grid max-w-[1600px] grid-cols-1 gap-4 p-3 md:p-5 lg:grid-cols-[auto_1fr]">
-        <Sidebar items={ADMIN_NAV_ITEMS} collapsed={collapsed} onToggle={() => setCollapsed((prev) => !prev)} />
+      {/* Docked Left Sidebar */}
+      <Sidebar items={ADMIN_NAV_ITEMS} collapsed={collapsed} onToggle={() => setCollapsed((prev) => !prev)} />
 
-        <section className="space-y-4 min-w-0">
-          <Navbar role={user?.role || 'Super Admin'} isDark={isDark} onToggleTheme={toggleTheme} onLogout={logout} />
-          <AnimatePresence mode="wait">
-            <motion.main
-              key={location.pathname}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.18 }}
-              className="min-h-[calc(100vh-8rem)]"
-            >
-              <Outlet />
-            </motion.main>
-          </AnimatePresence>
-        </section>
-      </div>
+      {/* Full-width Main Content Area */}
+      <section className="flex-1 flex flex-col min-w-0 px-4 py-3 md:px-6 md:py-4 space-y-4">
+        <Navbar role={user?.role || 'Super Admin'} onLogout={logout} />
+        <AnimatePresence mode="wait">
+          <motion.main
+            key={location.pathname}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.18 }}
+            className="flex-1 min-w-0"
+          >
+            <Outlet />
+          </motion.main>
+        </AnimatePresence>
+      </section>
     </div>
   );
 };

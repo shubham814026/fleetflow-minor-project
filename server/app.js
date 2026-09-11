@@ -23,6 +23,7 @@ import auditRoutes from './src/routes/auditRoutes.js';
 import forecastRoutes from './src/routes/forecastRoutes.js';
 import routeRoutes from './src/routes/routeRoutes.js';
 import mlInsightRoutes from './src/routes/mlInsightRoutes.js';
+import { checkDatabaseConnection } from './src/repositories/store.js';
 
 import { notFound, errorHandler } from './src/middleware/errorMiddleware.js';
 
@@ -58,8 +59,18 @@ app.get('/', (req, res) => {
   });
 });
 
-app.get('/api/health', (req, res) => {
-  res.json({ ok: true, name: 'SmartFleet AI Telemetry Gateway', status: 'Healthy' });
+app.get('/api/health', async (req, res) => {
+  const dbStatus = await checkDatabaseConnection();
+  res.json({
+    ok: true,
+    name: 'SmartFleet AI Telemetry Gateway',
+    status: 'Healthy',
+    database: {
+      provider: 'Supabase PostgreSQL',
+      orm: 'Prisma ORM',
+      ...dbStatus
+    }
+  });
 });
 
 // Feature API Routes

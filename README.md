@@ -8,16 +8,17 @@ Location: `server/`
 
 ### Stack
 - Node.js + Express
-- MongoDB + Mongoose
+- Supabase PostgreSQL + Prisma ORM (Relational Database)
 - JWT authentication
 - Role-based authorization
 
 ### Modules
-- `models/`: `User`, `Vehicle`, `Driver`, `Trip`, `MaintenanceLog`, `FuelLog`
-- `controllers/`: domain logic and validations
-- `routes/`: REST endpoints per module
-- `middleware/`: auth + error handling
-- `utils/`: token generation, async helpers, seeding
+- `prisma/schema.prisma`: Relational Schema for Users, Vehicles, Drivers, Trips, Maintenance, Fuel, etc.
+- `src/controllers/`: Domain logic and validations
+- `src/routes/`: REST endpoints per module
+- `src/middleware/`: Auth + error handling
+- `src/repositories/`: Prisma client & Supabase connector
+- `utils/`: Token generation, async helpers, seeding
 
 ### Key Business Rules Implemented
 - Vehicle dispatch blocked when status is `In Shop`, `Out of Service`, or `On Trip`
@@ -82,8 +83,8 @@ Location: `client/`
 
 ## 3) Integration Steps
 
-1. Start MongoDB locally (`mongodb://127.0.0.1:27017/fleetflow`) or update env values.
-2. Configure backend env using `server/.env.example`.
+1. Configure backend environment using `server/.env.example` with your Supabase PostgreSQL credentials.
+2. Generate Prisma Client (`npm run prisma:generate` or `npx prisma db push` to push schema to Supabase).
 3. Configure frontend env using `client/.env.example`.
 4. Seed backend data (`npm run seed` in `server`).
 5. Login from frontend using seeded credentials.
