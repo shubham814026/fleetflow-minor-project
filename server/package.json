@@ -7,6 +7,8 @@
   "scripts": {
     "dev": "nodemon index.js",
     "start": "node index.js",
+    "ml:service": "python ../ml_service/start_service.py",
+    "ml:test": "python ../ml_service/test_inference.py",
     "seed": "node utils/seed.js",
     "test:db": "node utils/verifyDatabase.js",
     "prisma:generate": "prisma generate",

@@ -1,7 +1,17 @@
 import { DEMO_FUEL_METRICS } from '../../../client/src/api/mockData.js';
+import { mlServiceClient } from '../services/mlServiceClient.js';
 
 export const getFuelMetrics = async (req, res) => {
-  return res.json({ success: true, data: DEMO_FUEL_METRICS });
+  try {
+    const liveInsights = await mlServiceClient.getFuelInsights();
+    const responseData = {
+      ...DEMO_FUEL_METRICS,
+      aiInsights: liveInsights
+    };
+    return res.json({ success: true, data: responseData });
+  } catch (err) {
+    return res.json({ success: true, data: DEMO_FUEL_METRICS });
+  }
 };
 
 export const addFuelLog = async (req, res) => {

@@ -1,155 +1,131 @@
-# FleetFlow – Modular Fleet & Logistics Management System
+# FleetFlow / SmartFleet AI – Real-Time Fleet & Logistics Intelligence Platform
 
-FleetFlow is a modular full-stack platform that digitizes fleet operations: vehicle lifecycle, driver compliance, trip dispatching, maintenance, fuel/expense tracking, and ROI analytics.
-
-## 1) Backend (Generated First)
-
-Location: `server/`
-
-### Stack
-- Node.js + Express
-- Supabase PostgreSQL + Prisma ORM (Relational Database)
-- JWT authentication
-- Role-based authorization
-
-### Modules
-- `prisma/schema.prisma`: Relational Schema for Users, Vehicles, Drivers, Trips, Maintenance, Fuel, etc.
-- `src/controllers/`: Domain logic and validations
-- `src/routes/`: REST endpoints per module
-- `src/middleware/`: Auth + error handling
-- `src/repositories/`: Prisma client & Supabase connector
-- `utils/`: Token generation, async helpers, seeding
-
-### Key Business Rules Implemented
-- Vehicle dispatch blocked when status is `In Shop`, `Out of Service`, or `On Trip`
-- Driver dispatch blocked when suspended, expired license, or already on trip
-- Trip creation blocked if `cargoWeight > vehicle.maxLoadCapacity`
-- Trip lifecycle supports: `Draft -> Dispatched -> Completed -> Cancelled`
-- On trip completion:
-  - vehicle odometer auto increments
-  - vehicle status returns to `Available` (or `Out of Service` if flagged)
-  - driver status moves to `On Duty`
-- On maintenance log creation:
-  - vehicle auto moves to `In Shop`
-  - vehicle is naturally excluded from available-dispatch lists
-- Vehicle deletion blocked if active trip exists
-- Driver completion rate auto-calculated using aggregate stats
-- Operational cost endpoint: `Fuel + Maintenance`
-- Analytics formulas:
-  - `Fuel Efficiency = km / L`
-  - `ROI = (Revenue - (Maintenance + Fuel)) / Acquisition Cost`
-
-### Seed Data
-Run seed script to generate realistic demo users, vehicles, drivers, trips, maintenance, and fuel logs.
-
-Seed credentials:
-- manager@fleetflow.io / Password123!
-- dispatcher@fleetflow.io / Password123!
-- safety@fleetflow.io / Password123!
-- finance@fleetflow.io / Password123!
+SmartFleet AI (FleetFlow) is an enterprise full-stack fleet management and predictive logistics platform. It pairs real-time GPS telemetry, driver management, maintenance scheduling, and fuel tracking with **5 production-grade Machine Learning inference models** served via a dedicated Python FastAPI microservice.
 
 ---
 
-## 2) Frontend
+## Architecture Overview
 
-Location: `client/`
-
-### Stack
-- React (Vite)
-- JavaScript (no TypeScript)
-- Tailwind CSS
-- React Router
-- Context API
-- Axios
-- Chart.js (`react-chartjs-2`)
-
-### UI Highlights
-- Clean SaaS-style layout (blue/indigo/gray)
-- KPI cards, status pills, responsive tables
-- Smooth hover states, no heavy animation
-- Toast notifications + loading spinners
-
-### Required Pages Implemented
-1. Login (JWT + role-based redirect)
-2. Dashboard Command Center (KPIs + filters)
-3. Vehicle Registry (CRUD + OOS toggle)
-4. Trip Dispatcher (capacity and availability validation)
-5. Maintenance & Service Logs (auto `In Shop` status behavior)
-6. Expense & Fuel Logging (operational cost computation)
-7. Driver Management (license compliance + completion rate view)
-8. Analytics (charts + CSV export)
+```
+┌──────────────────────────────────────┐
+│       React Frontend Client &        │
+│          Driver Mobile PWA           │
+│       (Vite + Tailwind CSS)          │
+│       http://localhost:5173          │
+└──────────────────┬───────────────────┘
+                   │
+                   │ REST API & WebSockets (Socket.IO)
+                   ▼
+┌──────────────────────────────────────┐
+│     Node.js Express Backend Gateway  │
+│   (Prisma ORM + Supabase PostgreSQL) │
+│       http://localhost:5000          │
+└──────────────────┬───────────────────┘
+                   │
+                   │ High-Speed Internal HTTP (<15ms)
+                   ▼
+┌──────────────────────────────────────┐
+│  Python FastAPI ML Inference Service │
+│   (Loads 5 Trained Models in RAM)    │
+│       http://127.0.0.1:8000          │
+└──────────────────────────────────────┘
+```
 
 ---
 
-## 3) Integration Steps
+## The 5 Integrated Real-Time Machine Learning Models
 
-1. Configure backend environment using `server/.env.example` with your Supabase PostgreSQL credentials.
-2. Generate Prisma Client (`npm run prisma:generate` or `npx prisma db push` to push schema to Supabase).
-3. Configure frontend env using `client/.env.example`.
-4. Seed backend data (`npm run seed` in `server`).
-5. Login from frontend using seeded credentials.
+All 5 models are loaded into memory on microservice startup for sub-15ms live inference:
+
+| Model # | Domain | Algorithm / Pipeline | Real-Time Endpoint | Frontend Integration |
+|---|---|---|---|---|
+| **7.1** | **Fuel Efficiency & Over-Consumption** | RandomForestRegressor ($R^2=0.9069$) + ColumnTransformer | `POST /predict/fuel-efficiency` | [`FuelPage.jsx`](client/src/pages/FuelPage.jsx): Live trip consumption residuals, excess liters, and monetary cost leakage (₹). |
+| **7.2** | **Resource Utilisation & Profiling** | K-Means ($k=2$, Silhouette: $0.8697$) + MinMaxScaler | `POST /predict/utilisation` | [`UtilisationPage.jsx`](client/src/pages/UtilisationPage.jsx): 0–100 dynamic utilisation score and recommendation tags (`Optimal`, `Monitor`, `Consider Removal`). |
+| **7.3** | **Driver Fraud & Theft Detection** | IsolationForest (contamination: $0.05$) | `POST /predict/fraud` | [`AlertsPage.jsx`](client/src/pages/AlertsPage.jsx) & Live Map: Siphoning and route anomaly flags with 0–100 risk score and automatic high-severity alerts. |
+| **7.4** | **Demand & Staffing Forecasting** | Holt-Winters Exponential Smoothing & Prophet ($7.5\%$ MAPE) | `GET /predict/demand` | [`ForecastPage.jsx`](client/src/pages/ForecastPage.jsx) & [`DashboardPage.jsx`](client/src/pages/DashboardPage.jsx): Next 7–30 day trip demand projections, peak days, and driver/vehicle capacity deficits. |
+| **7.5** | **Predictive Vehicle Maintenance** | Decision Tree Classifier & Random Forest (F1: $1.0$) | `POST /predict/maintenance` | [`MaintenancePage.jsx`](client/src/pages/MaintenancePage.jsx) & [`VehicleDetailPage.jsx`](client/src/pages/VehicleDetailPage.jsx): Breakdown risk score (%), overdue status, and component failure factors. |
 
 ---
 
-## 4) Setup Instructions
+## Project Structure
 
-### Backend
-```bash
+```text
+fleetflow-minor-project/
+├── client/                     # React 18 (Vite) Frontend & Driver PWA
+│   ├── src/
+│   │   ├── api/                # API client with offline demo fallback
+│   │   ├── components/         # UI components & Modals
+│   │   ├── layouts/            # AppLayout & DriverLayout
+│   │   ├── pages/              # Admin and Driver pages (LiveMap, Fuel, Utilisation, etc.)
+│   │   └── services/           # Socket.IO & IndexedDB GPS tracking service
+├── server/                     # Node.js Express Backend API Gateway
+│   ├── src/
+│   │   ├── config/             # Environment & Swagger configurations
+│   │   ├── controllers/        # Domain controllers (fuel, alert, vehicle, etc.)
+│   │   ├── routes/             # REST endpoints
+│   │   └── services/           # mlServiceClient (FastAPI bridge) & socketService
+│   ├── prisma/                 # Prisma database schema
+│   └── utils/                  # Database seed and verification utilities
+├── ml_service/                 # Python FastAPI Real-Time Inference Microservice
+│   ├── main.py                 # FastAPI application pre-loading 5 models in RAM
+│   ├── start_service.py        # Microservice launcher (Port 8000)
+│   ├── test_inference.py       # Automated test suite for all 5 ML endpoints
+│   └── requirements.txt        # Python ML runtime dependencies
+├── models/                     # Serialized production .joblib models (git-ignored)
+├── models code/                # Model training scripts and progression studies
+├── reports/                    # Model evaluation reports, CSVs, and PNG charts
+└── ml_datasets/                # Training datasets (git-ignored)
+```
+
+---
+
+## Quickstart Guide
+
+### 1. Start the Python ML Inference Microservice
+```powershell
+python ml_service/start_service.py
+```
+*Service will start on `http://127.0.0.1:8000` and pre-load all 5 models into RAM.*  
+*To verify all 5 endpoints:* `python ml_service/test_inference.py`
+
+### 2. Start the Node.js Express Backend
+```powershell
 cd server
 npm install
-copy .env.example .env
-npm run seed
 npm run dev
 ```
+*Backend runs on `http://localhost:5000` with Swagger documentation at `http://localhost:5000/api/docs`.*
 
-### Frontend
-```bash
+### 3. Start the React Frontend
+```powershell
 cd client
 npm install
-copy .env.example .env
 npm run dev
 ```
-
-Frontend URL: `http://localhost:5173`
-Backend URL: `http://localhost:5000`
+*Frontend runs on `http://localhost:5173`.*
 
 ---
 
-## 5) Demo Script (Hackathon Friendly)
+## Demo Credentials
 
-1. Login as **Fleet Manager** and open Dashboard.
-2. Show KPI cards and filter by `Truck` + `On Trip`.
-3. Go to Vehicle Registry and toggle one vehicle to `Out of Service`.
-4. Go to Trip Dispatcher:
-   - Attempt over-capacity cargo (show validation error)
-   - Create valid trip and dispatch
-5. Open Maintenance page and add service log:
-   - Explain auto status to `In Shop`
-   - Show vehicle unavailable for dispatch
-6. Open Expense & Fuel page and add a fuel record.
-7. Open Driver page and highlight completion rate + license visibility.
-8. Open Analytics page:
-   - Show Fuel Efficiency + ROI chart
-   - Export CSV
-9. Log out and log in as **Financial Analyst** to show role-scoped analytics access.
+| Role | Email | Password |
+|---|---|---|
+| **Super Admin** | `admin@fleetflow.com` | `admin123` |
+| **Fleet Manager** | `manager@smartfleet.ai` | `password123` |
+| **Driver (PWA)** | `driver@fleetflow.com` | `driver123` |
+| **Secondary Auth ID** | `SEC-1234` | `admin123` |
 
 ---
 
+## API Summary
 
-## API Overview
-
-- `POST /api/auth/login`
-- `GET /api/auth/me`
-- `GET/POST/PUT/DELETE /api/vehicles`
-- `PATCH /api/vehicles/:id/out-of-service`
-- `GET/POST/PUT/DELETE /api/drivers`
-- `GET/POST /api/trips`
-- `PATCH /api/trips/:id/status`
-- `GET/POST /api/maintenance`
-- `PATCH /api/maintenance/:id/resolve`
-- `GET/POST /api/fuel`
-- `GET /api/fuel/cost/:vehicleId`
-- `GET /api/dashboard`
-- `GET /api/analytics`
-
-
+- **Authentication**: `POST /api/auth/login`, `POST /api/auth/secondary-verify`
+- **Vehicles**: `GET/POST /api/vehicles`, `GET /api/vehicles/:id`, `GET /api/vehicles/utilisation`
+- **Drivers**: `GET/POST /api/drivers`, `GET /api/drivers/:id`, `GET /api/drivers/safety-metrics`
+- **Trips**: `GET /api/trips`, `POST /api/trips/start`, `POST /api/trips/:id/end`
+- **GPS Telemetry**: `POST /api/gps/points`, `POST /api/gps/sync-offline`
+- **Fuel Intelligence**: `GET /api/fuel`, `GET /api/fuel/metrics`, `POST /api/fuel/logs`
+- **Demand Forecasting**: `GET /api/forecast/demand`
+- **Predictive Maintenance**: `GET /api/maintenance`, `POST /api/maintenance`, `GET /api/ml-insights/maintenance/:vehicleId`
+- **Alerts & SOS**: `GET /api/alerts`, `POST /api/alerts/sos`, `PATCH /api/alerts/:id`
+- **ML Microservice Internal**: `POST /predict/fuel-efficiency`, `POST /predict/maintenance`, `POST /predict/fraud`, `POST /predict/utilisation`, `GET /predict/demand`

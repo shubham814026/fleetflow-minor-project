@@ -94,7 +94,34 @@ export const deleteVehicle = async (req, res) => {
 };
 
 export const getUtilisationMetrics = async (req, res) => {
-  return res.json({ success: true, data: DEMO_UTILISATION });
+  try {
+    const scoredList = await Promise.all(
+      DEMO_UTILISATION.map(async (item) => {
+        try {
+          const mlScore = await mlServiceClient.getDriverUtilisation(item.id, {
+            driver_id: item.id,
+            driver_name: item.assignedDriverName || 'Fleet Driver',
+            trips_per_day: item.tripsPerDay || 0.35,
+            active_hours: (item.activeHours || 6.5) * 240,
+            idle_hours: (item.idleRatio || 0.15) * (item.activeHours || 6.5) * 240
+          });
+          return {
+            ...item,
+            score: Math.round(mlScore.score),
+            recommendation: mlScore.recommendation,
+            cluster: mlScore.cluster,
+            isLiveModel: true
+          };
+        } catch {
+          return item;
+        }
+      })
+    );
+    return res.json({ success: true, data: scoredList });
+  } catch {
+    return res.json({ success: true, data: DEMO_UTILISATION });
+  }
 };
 
 export { VEHICLES };
+
