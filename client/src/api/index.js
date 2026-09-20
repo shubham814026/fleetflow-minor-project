@@ -605,3 +605,33 @@ export const carbonApi = {
     }
   }
 };
+
+export const mlApi = {
+  getFuelInsights: async () => {
+    try {
+      const res = await apiClient.get('/ml-insights/fuel');
+      return res.data?.data || res.data;
+    } catch (e) {
+      return null;
+    }
+  },
+
+  getFraudInsights: async () => {
+    try {
+      const res = await apiClient.get('/ml-insights/fraud');
+      return res.data?.data || res.data;
+    } catch (e) {
+      return null;
+    }
+  },
+
+  getMaintenanceInsights: async (vehicleId) => {
+    try {
+      const res = await apiClient.get(`/ml-insights/maintenance/${vehicleId}`);
+      return res.data?.data || res.data;
+    } catch (e) {
+      return null;
+    }
+  }
+};
+

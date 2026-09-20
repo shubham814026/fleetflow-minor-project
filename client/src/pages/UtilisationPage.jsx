@@ -33,6 +33,12 @@ export default function UtilisationPage() {
           </h1>
           <p className="text-xs text-slate-400 mt-1">Utilisation scores (0–100), active hours ratio & decision recommendations</p>
         </div>
+        {data.some((r) => r.isLiveModel) && (
+          <span className="px-2.5 py-1 bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 rounded-lg text-[10px] font-bold flex items-center gap-1.5 self-start md:self-auto">
+            <span className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse" />
+            AI Model 7.2 LIVE (K-Means Clustering)
+          </span>
+        )}
       </div>
 
       <div className="bg-slate-900/90 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
@@ -41,7 +47,8 @@ export default function UtilisationPage() {
             <thead className="bg-slate-950/80 text-slate-400 uppercase text-[10px] font-bold tracking-wider border-b border-slate-800">
               <tr>
                 <th className="p-4">Vehicle</th>
-                <th className="p-4">Utilisation Score</th>
+                <th className="p-4">Utilisation Score (AI Model 7.2)</th>
+                <th className="p-4">Cluster</th>
                 <th className="p-4">Active Hours / Day</th>
                 <th className="p-4">Idle / Active Ratio</th>
                 <th className="p-4">Trips / Day</th>
@@ -51,19 +58,31 @@ export default function UtilisationPage() {
             <tbody className="divide-y divide-slate-800/80">
               {data.map((row, idx) => (
                 <tr key={idx} className="hover:bg-slate-800/40 transition-colors">
-                  <td className="p-4 font-black text-slate-100">{row.vehicleReg}</td>
+                  <td className="p-4 font-black text-slate-100 flex items-center gap-2">
+                    {row.vehicleReg}
+                    {row.isLiveModel && (
+                      <span className="px-1.5 py-0.5 bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 rounded text-[9px] font-bold">
+                        AI LIVE
+                      </span>
+                    )}
+                  </td>
                   <td className="p-4">
                     <div className="flex items-center gap-2">
                       <div className="w-24 bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-800">
                         <div
                           className={`h-full ${
-                            row.score >= 80 ? 'bg-emerald-500' : row.score >= 50 ? 'bg-amber-500' : 'bg-rose-500'
+                            row.score >= 60 ? 'bg-emerald-500' : row.score >= 35 ? 'bg-amber-500' : 'bg-rose-500'
                           }`}
                           style={{ width: `${row.score}%` }}
                         />
                       </div>
                       <span className="font-bold text-slate-200">{row.score} / 100</span>
                     </div>
+                  </td>
+                  <td className="p-4">
+                    <span className="px-2 py-0.5 bg-slate-800 text-slate-300 rounded font-mono text-[10px]">
+                      Cluster {row.cluster !== undefined ? row.cluster : 0}
+                    </span>
                   </td>
                   <td className="p-4 font-semibold text-slate-200">{row.activeHours} hrs</td>
                   <td className="p-4 text-slate-300">{(row.idleRatio * 100).toFixed(0)}% idle</td>

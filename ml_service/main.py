@@ -313,11 +313,10 @@ def predict_maintenance(req: MaintenanceRequest):
     }
 
     feature_values = np.array([[feature_dict[c] for c in enriched_cols]])
-    X_scaled = scaler.transform(feature_values)
 
-    # 4. Infer with Random Forest & Decision Tree
-    service_required_rf = int(rf_model.predict(X_scaled)[0])
-    proba_rf = float(rf_model.predict_proba(X_scaled)[0][1])
+    # 4. Infer with Random Forest & Decision Tree (trained on unscaled domain features)
+    service_required_rf = int(rf_model.predict(feature_values)[0])
+    proba_rf = float(rf_model.predict_proba(feature_values)[0][1])
 
     risk_percentage = round(proba_rf * 100, 1)
     

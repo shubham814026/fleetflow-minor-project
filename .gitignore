@@ -17,3 +17,5 @@ models code/
 reports/
 .agents/
 skills-lock.json
+scratch/
+data/
