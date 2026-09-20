@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Bell, Shield, Database, Radio, Save, CheckCircle2, Lock, Sliders } from 'lucide-react';
+import { Settings, Bell, Shield, Database, Radio, Save, CheckCircle2, Lock, Sliders, RotateCcw, AlertTriangle, IndianRupee, Gauge } from 'lucide-react';
+import { settingsApi } from '../api';
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState({
@@ -8,28 +9,65 @@ export default function SettingsPage() {
     enableSoundAlerts: true,
     enableOfflineBuffering: true,
     autoRecenterMap: true,
-    mapTileTheme: 'Dark Navigation'
+    mapTileTheme: 'Dark Navigation',
+    speedLimitThresholdKmH: 80,
+    fuelPricePerLiter: 94.50,
+    alertEmailNotifications: true
   });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [savedToast, setSavedToast] = useState(false);
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem('fleetflow_settings');
-      if (stored) {
-        setSettings(JSON.parse(stored));
+    async function loadSettings() {
+      try {
+        setLoading(true);
+        const data = await settingsApi.get();
+        if (data) {
+          setSettings((prev) => ({ ...prev, ...data }));
+        }
+      } catch (err) {
+        console.error('Failed to load settings from server', err);
+      } finally {
+        setLoading(false);
       }
-    } catch (e) {}
+    }
+    loadSettings();
   }, []);
 
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
+    setSaving(true);
     try {
+      const updated = await settingsApi.update(settings);
+      if (updated) {
+        setSettings((prev) => ({ ...prev, ...updated }));
+      }
       localStorage.setItem('fleetflow_settings', JSON.stringify(settings));
       setSavedToast(true);
-      setTimeout(() => setSavedToast(false), 3000);
+      setTimeout(() => setSavedToast(false), 4000);
     } catch (err) {
       console.error('Failed to save settings', err);
+      alert('Error saving system preferences: ' + err.message);
+    } finally {
+      setSaving(false);
     }
+  };
+
+  const handleResetDefaults = () => {
+    if (!window.confirm('Reset all system preferences to recommended factory defaults?')) return;
+    const defaults = {
+      gpsIntervalSec: 15,
+      secondaryAuthTimeoutMins: 15,
+      enableSoundAlerts: true,
+      enableOfflineBuffering: true,
+      autoRecenterMap: true,
+      mapTileTheme: 'Dark Navigation',
+      speedLimitThresholdKmH: 80,
+      fuelPricePerLiter: 94.50,
+      alertEmailNotifications: true
+    };
+    setSettings(defaults);
   };
 
   return (
@@ -156,12 +194,68 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        <button
-          type="submit"
-          className="px-6 py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-amber-500/20 transition-all"
-        >
-          <Save className="w-4 h-4" /> Save System Preferences
-        </button>
+        {/* Fleet Operations & ML Cost Thresholds */}
+        <div className="bg-slate-900/90 border border-slate-800 p-6 rounded-2xl shadow-xl space-y-4 text-xs">
+          <h3 className="font-bold text-slate-100 border-b border-slate-800 pb-2 flex items-center gap-2">
+            <Gauge className="w-4 h-4 text-amber-400" /> Fleet Telemetry & ML Thresholds
+          </h3>
+
+          <div className="flex items-center justify-between p-3.5 bg-slate-950/80 border border-slate-800 rounded-xl">
+            <div>
+              <span className="font-bold text-slate-200 block">Speed Limit Alert Threshold</span>
+              <span className="text-[11px] text-slate-500">Trigger speeding incident alert when vehicle exceeds this speed</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min="40"
+                max="140"
+                value={settings.speedLimitThresholdKmH || 80}
+                onChange={(e) => setSettings({ ...settings, speedLimitThresholdKmH: parseInt(e.target.value, 10) || 80 })}
+                className="w-20 bg-slate-900 border border-slate-700 text-slate-200 rounded-lg px-2.5 py-1.5 font-bold text-center focus:outline-none focus:border-amber-500"
+              />
+              <span className="text-slate-400 font-bold">km/h</span>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between p-3.5 bg-slate-950/80 border border-slate-800 rounded-xl">
+            <div>
+              <span className="font-bold text-slate-200 block">Baseline Diesel Pricing (INR)</span>
+              <span className="text-[11px] text-slate-500">Unit rate per liter used by FastAPI ML microservice for fuel theft & excess cost calculation</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-slate-400 font-bold">₹</span>
+              <input
+                type="number"
+                step="0.5"
+                min="50"
+                max="200"
+                value={settings.fuelPricePerLiter || 94.5}
+                onChange={(e) => setSettings({ ...settings, fuelPricePerLiter: parseFloat(e.target.value) || 94.5 })}
+                className="w-24 bg-slate-900 border border-slate-700 text-slate-200 rounded-lg px-2.5 py-1.5 font-bold text-center focus:outline-none focus:border-amber-500"
+              />
+              <span className="text-slate-400 font-bold">/ Liter</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between pt-2">
+          <button
+            type="button"
+            onClick={handleResetDefaults}
+            className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs flex items-center gap-2 border border-slate-700 transition-colors"
+          >
+            <RotateCcw className="w-4 h-4" /> Reset to Defaults
+          </button>
+
+          <button
+            type="submit"
+            disabled={saving}
+            className="px-6 py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-amber-500/20 transition-all active:scale-95"
+          >
+            <Save className="w-4 h-4" /> {saving ? 'Saving Preferences...' : 'Save System Preferences'}
+          </button>
+        </div>
       </form>
     </div>
   );

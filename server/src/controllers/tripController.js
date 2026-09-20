@@ -1,5 +1,7 @@
 import { INITIAL_TRIPS } from '../../../client/src/api/mockData.js';
 import { broadcastTripEvent } from '../services/socketService.js';
+import { GEOFENCES } from './geofenceController.js';
+import { VEHICLES } from './vehicleController.js';
 
 let TRIPS = [...INITIAL_TRIPS];
 
@@ -65,6 +67,42 @@ export const startTrip = async (req, res) => {
   };
 
   TRIPS.unshift(newTrip);
+
+  // If driver GPS coordinates provided, anchor geofence to their exact location
+  if (newTrip.startLocation?.lat != null && newTrip.startLocation?.lng != null) {
+    const sLat = Number(newTrip.startLocation.lat);
+    const sLng = Number(newTrip.startLocation.lng);
+
+    const targetVeh = VEHICLES.find((v) => v.registration === newTrip.vehicleReg || v.id === newTrip.vehicleReg);
+    if (targetVeh) {
+      targetVeh.lat = sLat;
+      targetVeh.lng = sLng;
+      targetVeh.lastGpsUpdate = new Date().toISOString();
+      targetVeh.status = 'moving';
+    }
+
+    const driverGeoId = `geo-driver-${newTrip.vehicleReg}`;
+    const existingIdx = GEOFENCES.findIndex((g) => g.id === driverGeoId || (g.isDriverAnchor && g.vehicleReg === newTrip.vehicleReg));
+    const anchoredZone = {
+      id: driverGeoId,
+      name: `Driver Corridor (${newTrip.vehicleReg})`,
+      type: 'Permitted',
+      center: [sLat, sLng],
+      radius: 12000,
+      color: '#10B981',
+      isDriverAnchor: true,
+      vehicleReg: newTrip.vehicleReg,
+      driverName: newTrip.driverName,
+      anchoredAt: new Date().toISOString()
+    };
+
+    if (existingIdx >= 0) {
+      GEOFENCES[existingIdx] = anchoredZone;
+    } else {
+      GEOFENCES.unshift(anchoredZone);
+    }
+  }
+
   broadcastTripEvent('trip:started', newTrip);
 
   return res.status(201).json({ success: true, data: newTrip });
