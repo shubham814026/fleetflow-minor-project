@@ -455,6 +455,27 @@ export const geofenceApi = {
     }
   },
 
+  anchorDriverGeofence: async (payload) => {
+    try {
+      const res = await apiClient.post('/geofences/driver-anchor', payload);
+      return res.data?.data || res.data;
+    } catch (e) {
+      await delay();
+      const mockZone = {
+        id: `geo-driver-${payload.vehicleReg || 'KA-01-EQ-9042'}`,
+        name: payload.name || `Active Operating Corridor (${payload.vehicleReg || 'KA-01-EQ-9042'})`,
+        type: payload.type || 'Permitted',
+        center: [payload.latitude || payload.lat, payload.longitude || payload.lng],
+        radius: payload.radius || 12000,
+        color: (payload.type || '').toUpperCase() === 'RESTRICTED' ? '#EF4444' : '#10B981',
+        isDriverAnchor: true,
+        vehicleReg: payload.vehicleReg || 'KA-01-EQ-9042',
+        anchoredAt: new Date().toISOString()
+      };
+      return mockZone;
+    }
+  },
+
   delete: async (id) => {
     try {
       const res = await apiClient.delete(`/geofences/${id}`);
@@ -467,14 +488,33 @@ export const geofenceApi = {
 };
 
 export const salaryApi = {
-  getAll: async () => {
+  getAll: async (params = {}) => {
     try {
-      const res = await apiClient.get('/salary');
-      const data = res.data?.data || res.data;
-      return Array.isArray(data) ? data : DEMO_SALARIES;
+      const res = await apiClient.get('/salary', { params });
+      return res.data;
     } catch (e) {
       await delay();
-      return DEMO_SALARIES;
+      return {
+        success: true,
+        data: DEMO_SALARIES,
+        stats: {
+          totalRecords: DEMO_SALARIES.length,
+          totalDisbursed: 73000,
+          totalPending: 32000,
+          totalFailed: 30000,
+          avgSalary: 33750
+        }
+      };
+    }
+  },
+
+  create: async (data) => {
+    try {
+      const res = await apiClient.post('/salary', data);
+      return res.data?.data || res.data;
+    } catch (e) {
+      await delay();
+      return { id: `sal-${Date.now()}`, ...data, status: 'Pending', txnId: '-' };
     }
   },
 
@@ -486,18 +526,129 @@ export const salaryApi = {
       await delay();
       return { id, status, txnId: txnId || `TXN${Date.now().toString().slice(-8)}` };
     }
+  },
+
+  batchDisburse: async (ids) => {
+    try {
+      const res = await apiClient.post('/salary/batch-disburse', { ids });
+      return res.data;
+    } catch (e) {
+      await delay();
+      return { success: true, message: 'Processed batch disbursement' };
+    }
+  },
+
+  delete: async (id) => {
+    try {
+      const res = await apiClient.delete(`/salary/${id}`);
+      return res.data;
+    } catch (e) {
+      await delay();
+      return { success: true };
+    }
+  }
+};
+
+export const profileApi = {
+  getProfile: async () => {
+    try {
+      const res = await apiClient.get('/auth/profile');
+      return res.data?.data || res.data;
+    } catch (e) {
+      await delay();
+      const rawAuth = localStorage.getItem('fleetflow_auth');
+      const u = rawAuth ? JSON.parse(rawAuth)?.user : null;
+      return {
+        id: u?.id || 'usr-105',
+        name: u?.name || 'Fleet Admin',
+        email: u?.email || 'admin@fleetflow.com',
+        role: u?.role || 'SUPER_ADMIN',
+        phone: '+91 98765 43210',
+        department: 'Fleet Operations & Logistics',
+        designation: 'Head of Fleet Operations',
+        emergencyContact: '+91 98765 00000',
+        bio: 'Managing SmartFleet AI telemetry, real-time vehicle corridors, and dispatch logistics.',
+        twoFactorEnabled: true,
+        joinedDate: '2023-01-15',
+        lastLoginAt: new Date().toISOString()
+      };
+    }
+  },
+
+  updateProfile: async (profileData) => {
+    try {
+      const res = await apiClient.put('/auth/profile', profileData);
+      return res.data?.data || res.data;
+    } catch (e) {
+      await delay();
+      return { user: profileData };
+    }
+  },
+
+  changePassword: async (passwords) => {
+    try {
+      const res = await apiClient.post('/auth/change-password', passwords);
+      return res.data?.data || res.data;
+    } catch (e) {
+      await delay();
+      return { success: true };
+    }
+  }
+};
+
+export const settingsApi = {
+  get: async () => {
+    try {
+      const res = await apiClient.get('/settings');
+      return res.data?.data || res.data;
+    } catch (e) {
+      await delay();
+      const stored = localStorage.getItem('fleetflow_settings');
+      return stored ? JSON.parse(stored) : {
+        gpsIntervalSec: 15,
+        secondaryAuthTimeoutMins: 15,
+        enableSoundAlerts: true,
+        enableOfflineBuffering: true,
+        autoRecenterMap: true,
+        mapTileTheme: 'Dark Navigation',
+        speedLimitThresholdKmH: 80,
+        fuelPricePerLiter: 94.50,
+        alertEmailNotifications: true
+      };
+    }
+  },
+
+  update: async (settingsData) => {
+    try {
+      const res = await apiClient.put('/settings', settingsData);
+      return res.data?.data || res.data;
+    } catch (e) {
+      await delay();
+      localStorage.setItem('fleetflow_settings', JSON.stringify(settingsData));
+      return settingsData;
+    }
   }
 };
 
 export const auditApi = {
-  getAll: async () => {
+  getAll: async (params = {}) => {
     try {
-      const res = await apiClient.get('/audit-logs');
+      const res = await apiClient.get('/audit-logs', { params });
       const data = res.data?.data || res.data;
       return Array.isArray(data) ? data : DEMO_AUDIT_LOGS;
     } catch (e) {
       await delay();
       return DEMO_AUDIT_LOGS;
+    }
+  },
+
+  log: async (eventData) => {
+    try {
+      const res = await apiClient.post('/audit-logs', eventData);
+      return res.data?.data || res.data;
+    } catch (e) {
+      await delay();
+      return { id: `aud-${Date.now()}`, ...eventData, timestamp: new Date().toISOString() };
     }
   }
 };
@@ -563,45 +714,72 @@ export const routeApi = {
 export const carbonApi = {
   getMetrics: async () => {
     try {
-      const [vData, fData] = await Promise.all([
-        vehicleApi.getAll(),
-        fuelApi.getMetrics()
-      ]);
-      const vehicles = Array.isArray(vData) ? vData : (vData?.data || []);
-      const fuel = fData || {};
-      const totalLitres = fuel.totalLitres || 4820;
-      // 2.68 kg CO2 per litre of diesel
-      const totalCO2Tonnes = parseFloat(((totalLitres * 2.68) / 1000).toFixed(1));
-      const avgCO2PerVehicle = vehicles.length > 0 ? parseFloat((totalCO2Tonnes / vehicles.length).toFixed(2)) : 2.84;
-
-      const vehicleBreakdown = vehicles.map((v) => {
-        const estLitres = Math.round((v.odometer || 12000) / 3.8);
-        const co2 = parseFloat(((estLitres * 2.68) / 1000).toFixed(2));
-        return {
-          id: v.id,
-          registration: v.registration,
-          makeModel: v.makeModel,
-          driver: v.assignedDriverName || 'Unassigned',
-          co2Tonnes: co2,
-          rating: co2 < 2.5 ? 'Green A+' : co2 < 4.0 ? 'Standard B' : 'Needs Tuning C'
-        };
-      });
-
-      return {
-        totalCO2Tonnes: totalCO2Tonnes || 14.2,
-        avgCO2PerVehicle: avgCO2PerVehicle || 2.84,
-        reductionVsLastMonth: 6.4,
-        treeEquivalents: Math.round((totalCO2Tonnes || 14.2) * 45),
-        vehicleBreakdown
-      };
+      const res = await apiClient.get('/carbon/metrics');
+      return res.data?.data || res.data;
     } catch (e) {
-      return {
-        totalCO2Tonnes: 14.2,
-        avgCO2PerVehicle: 2.84,
-        reductionVsLastMonth: 6.4,
-        treeEquivalents: 639,
-        vehicleBreakdown: []
-      };
+      try {
+        const [vData, fData] = await Promise.all([
+          vehicleApi.getAll(),
+          fuelApi.getMetrics()
+        ]);
+        const vehicles = Array.isArray(vData) ? vData : (vData?.data || []);
+        const fuel = fData || {};
+        const totalLitres = fuel.totalLitres || 4820;
+        const totalCO2Tonnes = parseFloat(((totalLitres * 2.68) / 1000).toFixed(2));
+        const avgCO2PerVehicle = vehicles.length > 0 ? parseFloat((totalCO2Tonnes / vehicles.length).toFixed(2)) : 2.84;
+        const vehicleBreakdown = vehicles.map((v) => {
+          const estLitres = Math.round((v.odometer || 12000) / 3.8);
+          const co2 = parseFloat(((estLitres * 2.68) / 1000).toFixed(2));
+          return {
+            id: v.id,
+            registration: v.registration,
+            makeModel: v.makeModel,
+            driver: v.assignedDriverName || 'Unassigned',
+            co2Tonnes: co2,
+            rating: co2 <= 2.2 ? 'Green A+' : co2 <= 3.2 ? 'Efficient A' : 'Standard B'
+          };
+        });
+        return {
+          totalCO2Tonnes,
+          avgCO2PerVehicle,
+          reductionVsLastMonth: 7.2,
+          treeEquivalents: Math.round((totalCO2Tonnes * 1000) / 22),
+          greenFleetScore: 86,
+          vehicleBreakdown
+        };
+      } catch (err) {
+        return {
+          totalCO2Tonnes: 12.8,
+          avgCO2PerVehicle: 2.56,
+          reductionVsLastMonth: 7.2,
+          treeEquivalents: 581,
+          greenFleetScore: 86,
+          vehicleBreakdown: []
+        };
+      }
     }
   }
 };
+
+export const reportApi = {
+  getSummary: async () => {
+    try {
+      const res = await apiClient.get('/reports/summary');
+      return res.data?.data || res.data;
+    } catch (e) {
+      await delay();
+      return null;
+    }
+  },
+
+  getLogbook: async () => {
+    try {
+      const res = await apiClient.get('/reports/logbook');
+      return res.data?.data || res.data;
+    } catch (e) {
+      await delay();
+      return [];
+    }
+  }
+};
+

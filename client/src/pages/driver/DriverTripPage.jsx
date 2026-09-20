@@ -7,17 +7,22 @@ import { tripApi } from '../../api';
 export default function DriverTripPage() {
   const navigate = useNavigate();
   const [activeTrip, setActiveTrip] = useState(null);
+  const [anchoredGeofence, setAnchoredGeofence] = useState(null);
   const [speed, setSpeed] = useState(55);
   const [distance, setDistance] = useState(12.4);
   const [elapsedSeconds, setElapsedSeconds] = useState(840);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // 1. Load active trip from storage
+    // 1. Load active trip and geofence from storage
     try {
       const saved = localStorage.getItem('fleetflow_active_trip');
       if (saved) {
         setActiveTrip(JSON.parse(saved));
+      }
+      const savedGeo = localStorage.getItem('fleetflow_driver_geofence');
+      if (savedGeo) {
+        setAnchoredGeofence(JSON.parse(savedGeo));
       }
     } catch (e) {}
 
@@ -85,8 +90,19 @@ export default function DriverTripPage() {
         </h2>
         <p className="text-xs text-slate-400 flex items-center gap-1">
           <MapPin className="w-3.5 h-3.5 text-rose-400" />
-          {activeTrip?.origin || 'Bengaluru Nelamangala'} → {activeTrip?.destination || 'Chennai Port'}
+          {activeTrip?.origin || 'Driver GPS Origin'} → {activeTrip?.destination || 'Assigned Logistics Hub'}
         </p>
+
+        {/* Dynamic Geofence Compliance Bar */}
+        <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
+          <span className="text-slate-400 flex items-center gap-1.5 font-medium">
+            <ShieldCheck className="w-4 h-4 text-emerald-400" />
+            Geofence Corridor:
+          </span>
+          <span className="px-2 py-0.5 rounded font-black text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+            {anchoredGeofence ? `Anchored at Driver GPS (${(anchoredGeofence.radius / 1000).toFixed(0)} km)` : 'Protected Corridor Active'}
+          </span>
+        </div>
       </div>
 
       {/* Speedometer Gauge Display */}

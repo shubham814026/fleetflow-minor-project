@@ -1,5 +1,6 @@
 import { broadcastGpsUpdate } from '../services/socketService.js';
 import { VEHICLES } from './vehicleController.js';
+import { checkGeofenceViolations } from './geofenceController.js';
 
 let GPS_LOGS_STORE = [];
 
@@ -52,7 +53,14 @@ export const ingestGPSPoint = async (req, res) => {
     targetVeh.speed = speed || 0;
     targetVeh.heading = heading || 0;
     targetVeh.lastGpsAt = new Date().toISOString();
-    targetVeh.status = speed > 5 ? 'moving' : 'idle';
+
+    // Check geofence compliance in real time
+    const { hasViolation } = checkGeofenceViolations(latitude, longitude, targetVeh);
+    if (hasViolation) {
+      targetVeh.status = 'geofence_violation';
+    } else {
+      targetVeh.status = speed > 5 ? 'moving' : 'idle';
+    }
   }
 
   // Broadcast real-time Socket.IO update (Requirement 15)
@@ -63,6 +71,7 @@ export const ingestGPSPoint = async (req, res) => {
     lng: longitude,
     speed: speed || 0,
     heading: heading || 0,
+    status: targetVeh?.status || (speed > 5 ? 'moving' : 'idle'),
     timestamp: newPoint.timestamp
   });
 

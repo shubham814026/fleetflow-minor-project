@@ -23,6 +23,8 @@ import auditRoutes from './src/routes/auditRoutes.js';
 import forecastRoutes from './src/routes/forecastRoutes.js';
 import routeRoutes from './src/routes/routeRoutes.js';
 import mlInsightRoutes from './src/routes/mlInsightRoutes.js';
+import settingsRoutes from './src/routes/settingsRoutes.js';
+import carbonRoutes from './src/routes/carbonRoutes.js';
 import { checkDatabaseConnection } from './src/repositories/store.js';
 
 import { notFound, errorHandler } from './src/middleware/errorMiddleware.js';
@@ -91,6 +93,8 @@ app.use('/api/audit-logs', auditRoutes);
 app.use('/api/forecast', forecastRoutes);
 app.use('/api/routes', routeRoutes);
 app.use('/api/ml-insights', mlInsightRoutes);
+app.use('/api/settings', settingsRoutes);
+app.use('/api/carbon', carbonRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
