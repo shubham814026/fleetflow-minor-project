@@ -87,16 +87,6 @@ export default function AlertsPage() {
                 >
                   {alt.category}
                 </span>
-                {alt.isLiveModel && (
-                  <span className="px-1.5 py-0.5 bg-purple-500/20 text-purple-400 border border-purple-500/30 rounded text-[9px] font-bold">
-                    AI ISOLATION FOREST
-                  </span>
-                )}
-                {alt.fraudRiskScore && (
-                  <span className="px-1.5 py-0.5 bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded text-[9px] font-extrabold font-mono">
-                    RISK: {alt.fraudRiskScore}/100
-                  </span>
-                )}
                 <span className="text-xs font-bold text-slate-100">
                   Vehicle: {alt.vehicleReg} • Driver: {alt.driverName}
                 </span>

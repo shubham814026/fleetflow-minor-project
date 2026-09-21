@@ -32,11 +32,79 @@ class GPSService {
     }
   }
 
-  // High accuracy one-time position fetch
+  // IP Geolocation fallback when hardware GPS permission is blocked or unavailable
+  async getIPLocation() {
+    try {
+      const res = await fetch('https://ipwho.is/');
+      const data = await res.json();
+      if (data && data.latitude && data.longitude) {
+        return {
+          latitude: data.latitude,
+          longitude: data.longitude,
+          city: data.city,
+          region: data.region,
+          country: data.country,
+          accuracy: 1500,
+          speed: 0,
+          heading: 0,
+          source: 'Live IP Geolocation',
+          timestamp: new Date().toISOString()
+        };
+      }
+    } catch (e) {
+      try {
+        const res2 = await fetch('https://ipapi.co/json/');
+        const data2 = await res2.json();
+        if (data2 && data2.latitude && data2.longitude) {
+          return {
+            latitude: data2.latitude,
+            longitude: data2.longitude,
+            city: data2.city,
+            region: data2.region,
+            country: data2.country_name,
+            accuracy: 2500,
+            speed: 0,
+            heading: 0,
+            source: 'Live IP Geolocation',
+            timestamp: new Date().toISOString()
+          };
+        }
+      } catch (e2) {}
+    }
+    return null;
+  }
+
+  // Reverse geocode latitude and longitude to real human-readable street/city address
+  async reverseGeocode(lat, lng) {
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`, {
+        headers: { 'User-Agent': 'SmartFleetAI-DriverPortal/1.0' }
+      });
+      const data = await res.json();
+      if (data && data.display_name) {
+        return {
+          displayName: data.display_name,
+          road: data.address?.road || '',
+          suburb: data.address?.suburb || data.address?.neighbourhood || '',
+          city: data.address?.city || data.address?.town || data.address?.village || data.address?.county || '',
+          state: data.address?.state || '',
+          postcode: data.address?.postcode || ''
+        };
+      }
+    } catch (e) {
+      console.warn('Reverse geocode error', e);
+    }
+    return null;
+  }
+
+  // High accuracy one-time position fetch with automatic IP fallback
   async getCurrentLocation() {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       if (!navigator.geolocation) {
-        reject(new Error('Geolocation is not supported by your browser'));
+        this.getIPLocation().then((ipLoc) => {
+          if (ipLoc) resolve(ipLoc);
+          else resolve({ latitude: 19.0760, longitude: 72.8777, source: 'Default Fallback' });
+        });
         return;
       }
 
@@ -45,15 +113,24 @@ class GPSService {
           const coords = {
             latitude: position.coords.latitude,
             longitude: position.coords.longitude,
-            speed: position.coords.speed || 0,
+            speed: position.coords.speed ? Math.round(position.coords.speed * 3.6) : 0,
             heading: position.coords.heading || 0,
-            accuracy: position.coords.accuracy,
+            accuracy: Math.round(position.coords.accuracy || 10),
+            source: 'High-Accuracy Device GPS',
             timestamp: new Date(position.timestamp).toISOString()
           };
           resolve(coords);
         },
-        (error) => reject(error),
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        async (error) => {
+          console.warn('Device GPS unavailable or permission prompt deferred, fetching live IP location...', error);
+          const ipLoc = await this.getIPLocation();
+          if (ipLoc) {
+            resolve(ipLoc);
+          } else {
+            resolve({ latitude: 19.0760, longitude: 72.8777, accuracy: 5000, source: 'Regional Fallback' });
+          }
+        },
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
       );
     });
   }

@@ -208,14 +208,23 @@ export const driverApi = {
 };
 
 export const tripApi = {
-  getAll: async () => {
+  getAll: async (params = {}) => {
     try {
-      const res = await apiClient.get('/trips');
+      const res = await apiClient.get('/trips', { params });
       const data = res.data?.data || res.data;
       return Array.isArray(data) ? data : mockTrips;
     } catch (e) {
       await delay();
-      return mockTrips;
+      let res = [...mockTrips];
+      if (params.driverId) {
+        res = res.filter((t) => t.driverId === params.driverId);
+      } else if (params.driverName) {
+        res = res.filter((t) => t.driverName?.toLowerCase().includes(params.driverName.toLowerCase()));
+      }
+      if (params.status && params.status !== 'all') {
+        res = res.filter((t) => t.status?.toLowerCase() === params.status.toLowerCase());
+      }
+      return res;
     }
   },
 
@@ -261,19 +270,23 @@ export const tripApi = {
     }
   },
 
-  endTrip: async (id, summaryData) => {
+  endTrip: async (id, summaryData = {}) => {
     try {
       const res = await apiClient.post(`/trips/${id}/end`, summaryData);
       const updated = res.data?.data || res.data;
-      mockTrips = mockTrips.map((t) => (t.id === id ? { ...t, ...updated, status: 'Completed' } : t));
+      mockTrips = mockTrips.map((t) =>
+        t.id === id || t.tripCode === id ? { ...t, ...updated, status: 'Completed' } : t
+      );
       try {
         localStorage.removeItem('fleetflow_active_trip');
+        localStorage.removeItem('fleetflow_trip_path');
+        window.dispatchEvent(new Event('fleetflow_trip_ended'));
       } catch (err) {}
       return updated;
     } catch (e) {
       await delay();
       mockTrips = mockTrips.map((t) =>
-        t.id === id
+        t.id === id || t.tripCode === id
           ? {
               ...t,
               status: 'Completed',
@@ -284,6 +297,8 @@ export const tripApi = {
       );
       try {
         localStorage.removeItem('fleetflow_active_trip');
+        localStorage.removeItem('fleetflow_trip_path');
+        window.dispatchEvent(new Event('fleetflow_trip_ended'));
       } catch (err) {}
       return { id, status: 'Completed', ...summaryData };
     }
@@ -782,34 +797,4 @@ export const reportApi = {
     }
   }
 };
-
-export const mlApi = {
-  getFuelInsights: async () => {
-    try {
-      const res = await apiClient.get('/ml-insights/fuel');
-      return res.data?.data || res.data;
-    } catch (e) {
-      return null;
-    }
-  },
-
-  getFraudInsights: async () => {
-    try {
-      const res = await apiClient.get('/ml-insights/fraud');
-      return res.data?.data || res.data;
-    } catch (e) {
-      return null;
-    }
-  },
-
-  getMaintenanceInsights: async (vehicleId) => {
-    try {
-      const res = await apiClient.get(`/ml-insights/maintenance/${vehicleId}`);
-      return res.data?.data || res.data;
-    } catch (e) {
-      return null;
-    }
-  }
-};
-
 

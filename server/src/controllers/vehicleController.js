@@ -1,5 +1,4 @@
 import { INITIAL_VEHICLES, DEMO_UTILISATION } from '../../../client/src/api/mockData.js';
-import { mlServiceClient } from '../services/mlServiceClient.js';
 
 let VEHICLES = [...INITIAL_VEHICLES];
 
@@ -99,17 +98,12 @@ export const getUtilisationMetrics = async (req, res) => {
     const scoredList = await Promise.all(
       DEMO_UTILISATION.map(async (item) => {
         try {
-          const actHrs = Math.min(2200.0, (item.activeHours || 6.5) * 120.0);
-          const idleRatio = item.idleRatio || 0.15;
-          const idleHrs = (idleRatio / Math.max(0.01, 1.0 - idleRatio)) * actHrs;
-          const tripsPerDay = Math.min(0.36, ((item.tripsPerDay || 2.0) / 8.5) * 0.35);
-
           const mlScore = await mlServiceClient.getDriverUtilisation(item.id, {
             driver_id: item.id,
             driver_name: item.assignedDriverName || 'Fleet Driver',
-            trips_per_day: tripsPerDay,
-            active_hours: actHrs,
-            idle_hours: idleHrs
+            trips_per_day: item.tripsPerDay || 0.35,
+            active_hours: (item.activeHours || 6.5) * 240,
+            idle_hours: (item.idleRatio || 0.15) * (item.activeHours || 6.5) * 240
           });
           return {
             ...item,

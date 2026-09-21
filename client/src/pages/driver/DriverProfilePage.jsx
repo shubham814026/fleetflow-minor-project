@@ -29,14 +29,14 @@ export default function DriverProfilePage() {
   }, [user]);
 
   const profile = driverProfile || {
-    name: user?.name || 'Rajesh Kumar',
+    name: user?.name || 'Commercial Driver',
     email: user?.email || 'driver@fleetflow.com',
-    phone: '+91 98765 43210',
-    assignedVehicleReg: 'KA-01-EQ-9042',
-    safetyScore: 94,
-    totalTrips: 28,
-    rating: 4.9,
-    joinedDate: '2025-08-12'
+    phone: user?.phone || '+91 98765 43210',
+    assignedVehicleReg: user?.assignedVehicleReg || user?.vehicleReg || 'KA-01-EQ-9042',
+    safetyScore: user?.safetyScore || 94,
+    totalTrips: user?.totalTrips || 28,
+    rating: user?.rating || 4.9,
+    joinedDate: user?.joinedDate || '2025-08-12'
   };
 
   return (

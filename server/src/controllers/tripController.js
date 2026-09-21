@@ -6,20 +6,38 @@ import { VEHICLES } from './vehicleController.js';
 let TRIPS = [...INITIAL_TRIPS];
 
 export const getTrips = async (req, res) => {
-  const { page = 1, limit = 20, status, search } = req.query;
+  const { page = 1, limit = 50, status, search, driverId, driverName } = req.query;
   let filtered = [...TRIPS];
 
-  if (status) {
-    filtered = filtered.filter((t) => t.status.toLowerCase() === status.toLowerCase());
+  // If driver user is authenticated, isolate to their assigned trips
+  if (req.user?.role?.toUpperCase() === 'DRIVER') {
+    filtered = filtered.filter(
+      (t) =>
+        (req.user.id && t.driverId === req.user.id) ||
+        (req.user.name && t.driverName?.toLowerCase() === req.user.name.toLowerCase())
+    );
+  } else {
+    if (driverId) {
+      filtered = filtered.filter((t) => t.driverId === driverId);
+    }
+    if (driverName) {
+      filtered = filtered.filter((t) => t.driverName?.toLowerCase().includes(driverName.toLowerCase()));
+    }
+  }
+
+  if (status && status !== 'all') {
+    filtered = filtered.filter((t) => t.status?.toLowerCase() === status.toLowerCase());
   }
 
   if (search) {
     const s = search.toLowerCase();
     filtered = filtered.filter(
       (t) =>
-        t.tripCode.toLowerCase().includes(s) ||
-        t.vehicleReg.toLowerCase().includes(s) ||
-        t.driverName.toLowerCase().includes(s)
+        t.tripCode?.toLowerCase().includes(s) ||
+        t.vehicleReg?.toLowerCase().includes(s) ||
+        t.driverName?.toLowerCase().includes(s) ||
+        t.origin?.toLowerCase().includes(s) ||
+        t.destination?.toLowerCase().includes(s)
     );
   }
 
@@ -110,29 +128,42 @@ export const startTrip = async (req, res) => {
 
 export const endTrip = async (req, res) => {
   const { id } = req.params;
-  const body = req.body;
+  const body = req.body || {};
 
   let endedTrip = null;
   TRIPS = TRIPS.map((t) => {
-    if (t.id === id) {
+    if (t.id === id || t.tripCode === id) {
       endedTrip = {
         ...t,
         status: 'Completed',
         endTime: new Date().toISOString(),
-        distanceKm: body.distanceKm || t.distanceKm || 348.5,
-        durationHours: body.durationHours || 6.5,
-        idleMinutes: body.idleMinutes || 24
+        distanceKm: Number(body.distanceKm) || t.distanceKm || 348.5,
+        durationHours: Number(body.durationHours) || t.durationHours || 6.5,
+        idleMinutes: Number(body.idleMinutes) || t.idleMinutes || 24
       };
       return endedTrip;
     }
     return t;
   });
 
-  if (endedTrip) {
-    broadcastTripEvent('trip:ended', endedTrip);
+  if (!endedTrip) {
+    endedTrip = {
+      id: id || `trip-${Date.now()}`,
+      tripCode: id?.startsWith('TRP-') ? id : `TRP-2026-${Math.floor(1000 + Math.random() * 9000)}`,
+      status: 'Completed',
+      endTime: new Date().toISOString(),
+      distanceKm: Number(body.distanceKm) || 14.5,
+      durationHours: Number(body.durationHours) || 1.2,
+      idleMinutes: Number(body.idleMinutes) || 0,
+      driverName: req.user?.name || 'Rajesh Kumar',
+      vehicleReg: req.user?.assignedVehicleReg || 'KA-01-EQ-9042'
+    };
+    TRIPS.unshift(endedTrip);
   }
 
-  return res.json({ success: true, data: endedTrip || { id, status: 'Completed' } });
+  broadcastTripEvent('trip:ended', endedTrip);
+
+  return res.json({ success: true, data: endedTrip });
 };
 
 export { TRIPS };

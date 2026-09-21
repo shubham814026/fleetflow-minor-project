@@ -27,20 +27,10 @@ export default function ForecastPage() {
   return (
     <div className="space-y-6">
       <div className="bg-slate-900/90 border border-slate-800 p-6 rounded-2xl shadow-xl">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
-          <div>
-            <h1 className="text-xl font-black text-slate-100 flex items-center gap-2">
-              <TrendingUp className="w-6 h-6 text-amber-400" /> Fleet Demand & Load Forecasting
-            </h1>
-            <p className="text-xs text-slate-400 mt-1">Backend AI predictive demand feeds & regional load projections</p>
-          </div>
-          {data.isLiveModel && (
-            <span className="px-2.5 py-1 bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 rounded-lg text-[10px] font-bold flex items-center gap-1.5 self-start md:self-auto">
-              <span className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse" />
-              AI Model 7.4 LIVE (Prophet / Holt-Winters)
-            </span>
-          )}
-        </div>
+        <h1 className="text-xl font-black text-slate-100 flex items-center gap-2">
+          <TrendingUp className="w-6 h-6 text-amber-400" /> Fleet Demand & Load Forecasting
+        </h1>
+        <p className="text-xs text-slate-400 mt-1">Backend AI predictive demand feeds & regional load projections</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

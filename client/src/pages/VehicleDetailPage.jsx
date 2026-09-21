@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, NavLink } from 'react-router-dom';
-import { Truck, ShieldAlert, Lock, Unlock, CheckCircle, ArrowLeft, Fuel, Activity, Calendar, Wrench, Sparkles } from 'lucide-react';
-import { vehicleApi, mlApi } from '../api';
+import { Truck, ShieldAlert, Lock, Unlock, CheckCircle, ArrowLeft, Fuel, Activity, Calendar } from 'lucide-react';
+import { vehicleApi } from '../api';
 import SecondaryAuthModal from '../components/SecondaryAuthModal';
 
 export default function VehicleDetailPage() {
   const { id } = useParams();
   const [vehicle, setVehicle] = useState(null);
-  const [mlInsight, setMlInsight] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -15,12 +14,8 @@ export default function VehicleDetailPage() {
   useEffect(() => {
     async function loadVehicle() {
       try {
-        const [data, mlData] = await Promise.all([
-          vehicleApi.getById(id),
-          mlApi.getMaintenanceInsights(id)
-        ]);
+        const data = await vehicleApi.getById(id);
         setVehicle(data);
-        setMlInsight(mlData);
       } catch (err) {
         console.error('Error fetching vehicle details', err);
       } finally {
@@ -101,64 +96,6 @@ export default function VehicleDetailPage() {
             <p className="text-xs text-slate-400">PUC: <strong className="text-slate-200">{vehicle.pucExpiry}</strong></p>
           </div>
         </div>
-
-        {/* AI Predictive Maintenance Diagnostics (Model 7.5) */}
-        {mlInsight && (
-          <div className="border border-purple-500/30 bg-purple-950/10 rounded-xl p-5 relative overflow-hidden space-y-4">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 border-b border-purple-500/20 pb-3">
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-purple-400" />
-                <h3 className="text-sm font-bold text-slate-100">AI Predictive Maintenance Diagnostics (Model 7.5)</h3>
-                <span className="px-2 py-0.5 bg-purple-500/20 text-purple-300 rounded text-[9px] font-bold border border-purple-500/40">
-                  REAL-TIME INFERENCE
-                </span>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="text-[11px] text-slate-400">Breakdown Risk:</span>
-                <span className={`text-base font-black font-mono ${
-                  (mlInsight.breakdownRiskScore || 0) >= 70 ? 'text-rose-400' : (mlInsight.breakdownRiskScore || 0) >= 40 ? 'text-amber-400' : 'text-emerald-400'
-                }`}>
-                  {mlInsight.breakdownRiskScore}%
-                </span>
-                <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
-                  mlInsight.status === 'Overdue' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' :
-                  mlInsight.status === 'Due Soon' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
-                  'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                }`}>
-                  {mlInsight.status}
-                </span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-              <div className="p-3.5 bg-slate-950/70 border border-slate-800 rounded-lg space-y-1">
-                <span className="text-[10px] font-semibold text-slate-400 block uppercase">Primary Component at Risk</span>
-                <span className="text-sm font-bold text-amber-300 flex items-center gap-2">
-                  <Wrench className="w-4 h-4 text-amber-400" />
-                  {mlInsight.componentRisk || 'Brake System & Wear'}
-                </span>
-                <p className="text-[11px] text-slate-400 pt-1">
-                  Target Service Due Date: <strong className="text-slate-200">{mlInsight.predictedServiceDue || '2026-10-15'}</strong>
-                </p>
-              </div>
-
-              <div className="p-3.5 bg-slate-950/70 border border-slate-800 rounded-lg space-y-1">
-                <span className="text-[10px] font-semibold text-slate-400 block uppercase">Physical Wear Risk Factors</span>
-                <ul className="text-[11px] text-slate-300 space-y-1">
-                  {mlInsight.riskFactors && mlInsight.riskFactors.length > 0 ? (
-                    mlInsight.riskFactors.map((f, i) => (
-                      <li key={i} className="flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-purple-400" /> {f}
-                      </li>
-                    ))
-                  ) : (
-                    <li className="text-emerald-400">All mechanical telemetry within safe operating parameters.</li>
-                  )}
-                </ul>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Sensitive Information Section Gated by Secondary Auth */}
         <div className="border border-slate-800 bg-slate-950/90 rounded-xl p-5 relative overflow-hidden">

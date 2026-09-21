@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import { AlertOctagon, ShieldAlert, CheckCircle2, XCircle } from 'lucide-react';
 import gpsService from '../../services/gpsService';
 import { alertApi } from '../../api';
+import { useAuth } from '../../context/AuthContext';
 
 export default function DriverSOSPage() {
+  const { user } = useAuth();
   const [sosActive, setSosActive] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -15,10 +17,10 @@ export default function DriverSOSPage() {
     try {
       const pos = await gpsService.getCurrentLocation();
       const payload = {
-        driverId: 'drv-201',
-        driverName: 'Rajesh Kumar',
-        vehicleId: 'veh-101',
-        vehicleReg: 'KA-01-EQ-9042',
+        driverId: user?.id || 'drv-201',
+        driverName: user?.name || 'Commercial Driver',
+        vehicleId: user?.assignedVehicleId || 'veh-101',
+        vehicleReg: user?.assignedVehicleReg || user?.vehicleReg || 'KA-01-EQ-9042',
         lat: pos.latitude,
         lng: pos.longitude,
         timestamp: new Date().toISOString()

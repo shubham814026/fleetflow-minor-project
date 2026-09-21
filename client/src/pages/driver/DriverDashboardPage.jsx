@@ -3,11 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { Navigation, Truck, Play, Square, AlertOctagon, Wifi, Radio, MapPin, CheckCircle, ShieldCheck, Crosshair, LocateFixed } from 'lucide-react';
 import gpsService from '../../services/gpsService';
 import { tripApi, alertApi, geofenceApi } from '../../api';
+import { useAuth } from '../../context/AuthContext';
 
 export default function DriverDashboardPage() {
+  const { user } = useAuth();
   const [activeTrip, setActiveTrip] = useState(null);
   const [gpsStatus, setGpsStatus] = useState('Standby');
   const [currentCoords, setCurrentCoords] = useState(null);
+  const [currentAddress, setCurrentAddress] = useState(null);
   const [anchoredGeofence, setAnchoredGeofence] = useState(null);
   const [loading, setLoading] = useState(false);
   const [gpsFetching, setGpsFetching] = useState(false);
@@ -15,7 +18,8 @@ export default function DriverDashboardPage() {
   const [showConfirmEnd, setShowConfirmEnd] = useState(false);
 
   const navigate = useNavigate();
-  const assignedVehicleReg = 'KA-01-EQ-9042';
+  const assignedVehicleReg = user?.assignedVehicleReg || user?.vehicleReg || 'KA-01-EQ-9042';
+  const driverName = user?.name || 'Fleet Driver';
 
   useEffect(() => {
     try {
@@ -26,13 +30,49 @@ export default function DriverDashboardPage() {
           setActiveTrip(parsed);
           setGpsStatus('Tracking Active');
         }
+      } else {
+        tripApi.getAll({ status: 'In Transit' }).then((data) => {
+          const list = Array.isArray(data) ? data : data?.data || [];
+          const found = list.find(
+            (t) =>
+              t.status === 'In Transit' &&
+              ((user?.name && t.driverName && t.driverName.toLowerCase().includes(user.name.toLowerCase())) ||
+                (user?.id && t.driverId === user.id) ||
+                !user?.name)
+          );
+          if (found) {
+            setActiveTrip(found);
+            setGpsStatus('Tracking Active');
+            localStorage.setItem('fleetflow_active_trip', JSON.stringify(found));
+          }
+        }).catch(() => {});
       }
+
       const savedGeo = localStorage.getItem('fleetflow_driver_geofence');
       if (savedGeo) {
         setAnchoredGeofence(JSON.parse(savedGeo));
       }
     } catch (e) {}
-  }, []);
+
+    const handleTripEnded = () => {
+      setActiveTrip(null);
+      setGpsStatus('Standby');
+    };
+    window.addEventListener('fleetflow_trip_ended', handleTripEnded);
+
+    // Fetch initial device GPS coordinates immediately
+    gpsService.getCurrentLocation().then((pos) => {
+      setCurrentCoords(pos);
+      setGpsStatus('Live GPS Ready');
+      gpsService.reverseGeocode(pos.latitude, pos.longitude).then((addr) => {
+        if (addr) setCurrentAddress(addr.displayName || `${addr.road}, ${addr.city}`);
+      });
+    }).catch(() => {});
+
+    return () => {
+      window.removeEventListener('fleetflow_trip_ended', handleTripEnded);
+    };
+  }, [user]);
 
   // Quick GPS test and anchor geofence directly to driver's real position
   const handleAnchorGeofenceNow = async () => {
@@ -42,9 +82,12 @@ export default function DriverDashboardPage() {
       setCurrentCoords(pos);
       setGpsStatus('GPS Fix Acquired');
 
+      const addr = await gpsService.reverseGeocode(pos.latitude, pos.longitude);
+      if (addr) setCurrentAddress(addr.displayName || `${addr.road}, ${addr.city}`);
+
       const geo = await geofenceApi.anchorDriverGeofence({
         vehicleReg: assignedVehicleReg,
-        driverName: 'Rajesh Kumar',
+        driverName,
         lat: pos.latitude,
         lng: pos.longitude,
         radius: 12000,
@@ -75,10 +118,13 @@ export default function DriverDashboardPage() {
       const pos = await gpsService.getCurrentLocation();
       setCurrentCoords(pos);
 
+      const addr = await gpsService.reverseGeocode(pos.latitude, pos.longitude);
+      const originTitle = addr?.city ? `${addr.road ? addr.road + ', ' : ''}${addr.city}` : `Live GPS (${pos.latitude.toFixed(3)}, ${pos.longitude.toFixed(3)})`;
+
       // 2. Anchor geofence directly to the driver's current coordinates (not randomly!)
       const geo = await geofenceApi.anchorDriverGeofence({
         vehicleReg: assignedVehicleReg,
-        driverName: 'Rajesh Kumar',
+        driverName,
         lat: pos.latitude,
         lng: pos.longitude,
         radius: 12000,
@@ -91,9 +137,9 @@ export default function DriverDashboardPage() {
       // 3. Start backend trip record with driver's actual start coordinates
       const newTrip = await tripApi.startTrip({
         vehicleReg: assignedVehicleReg,
-        driverName: 'Rajesh Kumar',
-        origin: 'Driver Live GPS Origin',
-        destination: 'Assigned Logistics Destination',
+        driverName,
+        origin: originTitle,
+        destination: 'Regional Logistics Distribution Center',
         startLocation: { lat: pos.latitude, lng: pos.longitude }
       });
 
@@ -121,18 +167,25 @@ export default function DriverDashboardPage() {
       gpsService.stopTracking();
       setGpsStatus('Standby');
 
-      if (activeTrip) {
-        await tripApi.endTrip(activeTrip.id, {
-          distanceKm: 348.5,
-          durationHours: 6.5,
-          idleMinutes: 24
-        });
-      }
+      const targetId = activeTrip?.id || activeTrip?.tripCode || 'trip-active';
+      await tripApi.endTrip(targetId, {
+        distanceKm: Number(activeTrip?.distanceKm) || 14.5,
+        durationHours: Number(activeTrip?.durationHours) || 1.2,
+        idleMinutes: 10
+      });
 
+      localStorage.removeItem('fleetflow_active_trip');
+      localStorage.removeItem('fleetflow_trip_path');
+      localStorage.removeItem('fleetflow_driver_geofence');
       setActiveTrip(null);
-      alert('Trip Completed! Summary submitted to fleet server.');
+      navigate('/driver/history');
     } catch (err) {
-      alert('Error completing trip: ' + err.message);
+      console.error('Error completing trip', err);
+      localStorage.removeItem('fleetflow_active_trip');
+      localStorage.removeItem('fleetflow_trip_path');
+      localStorage.removeItem('fleetflow_driver_geofence');
+      setActiveTrip(null);
+      navigate('/driver/history');
     } finally {
       setLoading(false);
     }

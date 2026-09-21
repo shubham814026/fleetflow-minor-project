@@ -285,6 +285,46 @@ export const INITIAL_TRIPS = [
     endTime: '2026-08-26T10:48:00.000Z',
     avgSpeed: 52.1,
     fuelConsumedLitres: 62.0
+  },
+  {
+    id: 'trip-904',
+    tripCode: 'TRP-2026-0885',
+    vehicleId: 'veh-101',
+    vehicleReg: 'KA-01-EQ-9042',
+    driverId: 'drv-201',
+    driverName: 'Rajesh Kumar',
+    origin: 'Bengaluru ICD Nelamangala',
+    destination: 'Mysuru Industrial Estate',
+    startLocation: { lat: 12.9716, lng: 77.5946, address: 'Bengaluru, KA' },
+    endLocation: { lat: 12.2958, lng: 76.6394, address: 'Mysuru, KA' },
+    status: 'Completed',
+    distanceKm: 145.2,
+    durationHours: 3.4,
+    idleMinutes: 18,
+    startTime: '2026-08-25T06:30:00.000Z',
+    endTime: '2026-08-25T09:54:00.000Z',
+    avgSpeed: 48.2,
+    fuelConsumedLitres: 38.5
+  },
+  {
+    id: 'trip-905',
+    tripCode: 'TRP-2026-0878',
+    vehicleId: 'veh-101',
+    vehicleReg: 'KA-01-EQ-9042',
+    driverId: 'drv-201',
+    driverName: 'Rajesh Kumar',
+    origin: 'Hosur Manufacturing Corridor',
+    destination: 'Bengaluru ICD Nelamangala',
+    startLocation: { lat: 12.7409, lng: 77.8253, address: 'Hosur, TN' },
+    endLocation: { lat: 12.9716, lng: 77.5946, address: 'Bengaluru, KA' },
+    status: 'Completed',
+    distanceKm: 68.0,
+    durationHours: 1.8,
+    idleMinutes: 10,
+    startTime: '2026-08-23T14:00:00.000Z',
+    endTime: '2026-08-23T15:48:00.000Z',
+    avgSpeed: 42.0,
+    fuelConsumedLitres: 19.4
   }
 ];
 

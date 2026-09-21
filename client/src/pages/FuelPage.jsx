@@ -83,27 +83,14 @@ export default function FuelPage() {
               className="p-4 bg-slate-950/80 border border-slate-800/80 rounded-xl space-y-2 relative overflow-hidden"
             >
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-amber-400">{ins.title}</span>
-                  {ins.isLiveModel && (
-                    <span className="px-1.5 py-0.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded text-[9px] font-bold flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                      AI Model 7.1 LIVE
-                    </span>
-                  )}
-                </div>
+                <span className="text-xs font-bold text-amber-400">{ins.title}</span>
                 <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 rounded text-[10px] font-extrabold">
                   Savings: {ins.potentialSavings}
                 </span>
               </div>
               <p className="text-xs text-slate-300 font-medium">{ins.description}</p>
-              <div className="text-[11px] text-slate-400 pt-1 flex items-center justify-between">
-                <span>Target Asset: <strong className="text-slate-200">{ins.vehicle}</strong></span>
-                {ins.predictedFuelPerKm && (
-                  <span className="text-[10px] font-mono text-indigo-400">
-                    Est. Rate: {ins.predictedFuelPerKm} L/km
-                  </span>
-                )}
+              <div className="text-[11px] text-slate-400 pt-1">
+                Target Asset: <strong className="text-slate-200">{ins.vehicle}</strong>
               </div>
             </div>
           ))}
