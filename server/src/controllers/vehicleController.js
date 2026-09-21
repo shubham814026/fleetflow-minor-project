@@ -1,4 +1,5 @@
 import { INITIAL_VEHICLES, DEMO_UTILISATION } from '../../../client/src/api/mockData.js';
+import { mlServiceClient } from '../services/mlServiceClient.js';
 
 let VEHICLES = [...INITIAL_VEHICLES];
 

@@ -92,6 +92,12 @@ def load_all_models():
     print("=" * 60)
 
 
+def get_model(name: str):
+    if MODELS.get(name) is None:
+        load_all_models()
+    return MODELS.get(name)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     load_all_models()
@@ -185,6 +191,8 @@ class DriverUtilisationRequest(BaseModel):
 @app.get("/health")
 def health_check():
     """Health check endpoint showing active status of all 5 ML models."""
+    if any(v != "LOADED" for v in LOAD_STATUS.values()) or any(m is None for m in MODELS.values()):
+        load_all_models()
     return {
         "status": "online",
         "service": "SmartFleet AI Inference Microservice",
@@ -198,7 +206,7 @@ def health_check():
 # ---------------------------------------------------------------------
 @app.post("/predict/fuel-efficiency")
 def predict_fuel_efficiency(req: FuelEfficiencyRequest):
-    pipeline = MODELS.get("fuel_efficiency")
+    pipeline = get_model("fuel_efficiency")
     if pipeline is None:
         raise HTTPException(status_code=503, detail="Fuel efficiency model not loaded")
 
@@ -267,7 +275,7 @@ def predict_fuel_efficiency(req: FuelEfficiencyRequest):
 # ---------------------------------------------------------------------
 @app.post("/predict/maintenance")
 def predict_maintenance(req: MaintenanceRequest):
-    bundle = MODELS.get("predictive_maintenance")
+    bundle = get_model("predictive_maintenance")
     if bundle is None:
         raise HTTPException(status_code=503, detail="Predictive maintenance model not loaded")
 
@@ -313,10 +321,11 @@ def predict_maintenance(req: MaintenanceRequest):
     }
 
     feature_values = np.array([[feature_dict[c] for c in enriched_cols]])
+    X_scaled = scaler.transform(feature_values)
 
-    # 4. Infer with Random Forest & Decision Tree (trained on unscaled domain features)
-    service_required_rf = int(rf_model.predict(feature_values)[0])
-    proba_rf = float(rf_model.predict_proba(feature_values)[0][1])
+    # 4. Infer with Random Forest & Decision Tree
+    service_required_rf = int(rf_model.predict(X_scaled)[0])
+    proba_rf = float(rf_model.predict_proba(X_scaled)[0][1])
 
     risk_percentage = round(proba_rf * 100, 1)
     
@@ -356,7 +365,7 @@ def predict_maintenance(req: MaintenanceRequest):
 # ---------------------------------------------------------------------
 @app.post("/predict/fraud")
 def predict_fraud(req: FraudDetectionRequest):
-    bundle = MODELS.get("fraud_detection")
+    bundle = get_model("fraud_detection")
     if bundle is None:
         raise HTTPException(status_code=503, detail="Fraud detection model not loaded")
 
@@ -411,7 +420,7 @@ def predict_fraud(req: FraudDetectionRequest):
 # ---------------------------------------------------------------------
 @app.post("/predict/utilisation")
 def predict_utilisation(req: DriverUtilisationRequest):
-    bundle = MODELS.get("resource_utilisation")
+    bundle = get_model("resource_utilisation")
     if bundle is None:
         raise HTTPException(status_code=503, detail="Resource utilisation model not loaded")
 
@@ -461,7 +470,7 @@ def predict_utilisation(req: DriverUtilisationRequest):
 # ---------------------------------------------------------------------
 @app.get("/predict/demand")
 def predict_demand(days: int = 7):
-    bundle = MODELS.get("demand_forecasting")
+    bundle = get_model("demand_forecasting")
     if bundle is None:
         raise HTTPException(status_code=503, detail="Demand forecasting model not loaded")
 
