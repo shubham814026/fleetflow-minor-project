@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, NavLink } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Polyline, Popup } from 'react-leaflet';
 import L from 'leaflet';
-import { Waypoints, ArrowLeft, Clock, MapPin, Fuel, Gauge, ShieldCheck } from 'lucide-react';
+import { Waypoints, ArrowLeft, Clock, MapPin, Fuel, Gauge, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { tripApi } from '../api';
 
 const startIcon = L.divIcon({
@@ -57,6 +57,25 @@ export default function TripDetailPage() {
           {trip.tripCode}
         </span>
       </div>
+
+      {trip.isEarlyTermination && (
+        <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-start gap-3 text-xs shadow-lg animate-fadeIn">
+          <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <span className="font-black text-amber-400 uppercase tracking-wide block">
+              Incomplete / Early Termination Incident Logged
+            </span>
+            <p className="text-slate-300">
+              This run was terminated {trip.distanceFromDestinationKm ? `${trip.distanceFromDestinationKm} km before reaching destination` : 'away from the planned destination hub'}.
+            </p>
+            {trip.terminationReason && (
+              <p className="text-amber-200 bg-amber-950/40 px-2.5 py-1 rounded-lg border border-amber-500/20 inline-block font-mono text-[11px]">
+                <strong>Driver Reason:</strong> {trip.terminationReason}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Trip Meta Card */}

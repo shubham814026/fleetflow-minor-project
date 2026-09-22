@@ -1,7 +1,8 @@
 import { INITIAL_TRIPS } from '../../../client/src/api/mockData.js';
-import { broadcastTripEvent } from '../services/socketService.js';
+import { broadcastTripEvent, broadcastAlert } from '../services/socketService.js';
 import { GEOFENCES } from './geofenceController.js';
 import { VEHICLES } from './vehicleController.js';
+import { ALERTS } from './alertController.js';
 
 let TRIPS = [...INITIAL_TRIPS];
 
@@ -70,7 +71,9 @@ export const startTrip = async (req, res) => {
     id: `trip-${Date.now()}`,
     tripCode: `TRP-2026-${Math.floor(1000 + Math.random() * 9000)}`,
     vehicleReg: body.vehicleReg || 'KA-01-EQ-9042',
+    vehicleId: body.vehicleId || 'veh-101',
     driverName: body.driverName || req.user?.name || 'Rajesh Kumar',
+    driverId: req.user?.id || req.user?.userId || 'drv-201',
     origin: body.origin || 'Bengaluru ICD Nelamangala',
     destination: body.destination || 'Chennai Port Container Terminal',
     startLocation: body.startLocation || { lat: 12.9716, lng: 77.5946 },
@@ -130,6 +133,10 @@ export const endTrip = async (req, res) => {
   const { id } = req.params;
   const body = req.body || {};
 
+  const isEarly = Boolean(body.isEarlyTermination);
+  const terminationReason = body.terminationReason || null;
+  const distAway = body.distanceFromDestinationKm != null ? Number(body.distanceFromDestinationKm) : null;
+
   let endedTrip = null;
   TRIPS = TRIPS.map((t) => {
     if (t.id === id || t.tripCode === id) {
@@ -139,7 +146,11 @@ export const endTrip = async (req, res) => {
         endTime: new Date().toISOString(),
         distanceKm: Number(body.distanceKm) || t.distanceKm || 348.5,
         durationHours: Number(body.durationHours) || t.durationHours || 6.5,
-        idleMinutes: Number(body.idleMinutes) || t.idleMinutes || 24
+        idleMinutes: Number(body.idleMinutes) || t.idleMinutes || 24,
+        isEarlyTermination: isEarly,
+        terminationReason: terminationReason,
+        distanceFromDestinationKm: distAway,
+        finalLocation: body.endLocation || t.endLocation
       };
       return endedTrip;
     }
@@ -156,9 +167,30 @@ export const endTrip = async (req, res) => {
       durationHours: Number(body.durationHours) || 1.2,
       idleMinutes: Number(body.idleMinutes) || 0,
       driverName: req.user?.name || 'Rajesh Kumar',
-      vehicleReg: req.user?.assignedVehicleReg || 'KA-01-EQ-9042'
+      vehicleReg: req.user?.assignedVehicleReg || 'KA-01-EQ-9042',
+      isEarlyTermination: isEarly,
+      terminationReason: terminationReason,
+      distanceFromDestinationKm: distAway,
+      finalLocation: body.endLocation || null
     };
     TRIPS.unshift(endedTrip);
+  }
+
+  // If ended prematurely away from destination, generate high-severity alert for fleet manager
+  if (isEarly) {
+    const earlyAlert = {
+      id: `alt-early-${Date.now()}`,
+      category: 'Fraud',
+      severity: 'High',
+      vehicleReg: endedTrip.vehicleReg || 'KA-01-EQ-9042',
+      driverName: endedTrip.driverName || 'Rajesh Kumar',
+      description: `Early Route Termination: Trip ${endedTrip.tripCode} ended ${distAway ? distAway + ' km before reaching ' : 'away from '}${endedTrip.destination}. Reason: ${terminationReason || 'Unspecified'}.`,
+      timestamp: new Date().toISOString(),
+      status: 'Open',
+      location: body.endLocation || { lat: 12.9716, lng: 77.5946 }
+    };
+    ALERTS.unshift(earlyAlert);
+    broadcastAlert(earlyAlert);
   }
 
   broadcastTripEvent('trip:ended', endedTrip);

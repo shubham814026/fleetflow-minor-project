@@ -279,6 +279,32 @@ export default function DriverTripPage() {
   };
 
   const [showEndModal, setShowEndModal] = useState(false);
+  const [terminationReason, setTerminationReason] = useState('Vehicle Breakdown / Mechanical Failure');
+  const [customReasonNotes, setCustomReasonNotes] = useState('');
+
+  const getDestinationCoords = () => {
+    if (activeTrip?.endLocation?.lat != null && activeTrip?.endLocation?.lng != null) {
+      return [Number(activeTrip.endLocation.lat), Number(activeTrip.endLocation.lng)];
+    }
+    const dest = (activeTrip?.destination || '').toLowerCase();
+    if (dest.includes('chennai')) return [13.0827, 80.2707];
+    if (dest.includes('pune') || dest.includes('chakan')) return [18.7600, 73.8500];
+    if (dest.includes('jaipur')) return [26.9124, 75.7873];
+    if (dest.includes('mysuru')) return [12.2958, 76.6394];
+    if (dest.includes('bengaluru')) return [12.9716, 77.5946];
+    return null;
+  };
+
+  const destCoords = getDestinationCoords();
+  const currentLat = currentCoords?.[0];
+  const currentLng = currentCoords?.[1];
+
+  const distanceToDestination =
+    destCoords && currentLat != null && currentLng != null
+      ? haversineDistanceKm(currentLat, currentLng, destCoords[0], destCoords[1])
+      : null;
+
+  const isNearDestination = distanceToDestination != null ? distanceToDestination <= 1.5 : false;
 
   // 5. Complete & End Active Trip
   const handleEndTripClick = () => {
@@ -289,11 +315,22 @@ export default function DriverTripPage() {
     setShowEndModal(false);
     setLoading(true);
     try {
+      const isEarly = !isNearDestination;
+      const fullReason = isEarly
+        ? (customReasonNotes.trim() ? `${terminationReason} - ${customReasonNotes.trim()}` : terminationReason)
+        : null;
+
       const targetId = activeTrip?.id || activeTrip?.tripCode || 'trip-active';
       await tripApi.endTrip(targetId, {
         distanceKm: Number(distanceKm) || Number(activeTrip?.distanceKm) || 0,
         durationHours: parseFloat((elapsedSeconds / 3600).toFixed(2)) || Number(activeTrip?.durationHours) || 0.1,
-        idleMinutes: 0
+        idleMinutes: 0,
+        isEarlyTermination: isEarly,
+        terminationReason: fullReason,
+        distanceFromDestinationKm: distanceToDestination ? parseFloat(distanceToDestination.toFixed(1)) : null,
+        endLocation: currentLat != null && currentLng != null
+          ? { lat: currentLat, lng: currentLng, address: currentAddress || 'Roadside Stop' }
+          : undefined
       });
       localStorage.removeItem('fleetflow_active_trip');
       localStorage.removeItem('fleetflow_trip_path');
@@ -508,16 +545,77 @@ export default function DriverTripPage() {
         </>
       )}
 
-      {/* In-App Confirm End Modal */}
+      {/* In-App Confirm End Modal with Smart Proximity Gate */}
       {showEndModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl max-w-sm w-full space-y-4 shadow-2xl">
-            <h3 className="text-base font-black text-slate-100 flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-rose-500" /> Complete & End Trip?
-            </h3>
-            <p className="text-xs text-slate-400">
-              Finalize route telemetry and commit <span className="text-amber-400 font-bold">{distanceKm} km</span> and duty hours to the official driver logbook.
-            </p>
+          <div className="bg-slate-900 border border-slate-700 p-6 rounded-3xl max-w-sm w-full space-y-4 shadow-2xl text-left">
+            {isNearDestination ? (
+              // Case 1: Arrived at destination (Within 1.5 km)
+              <>
+                <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center mx-auto">
+                  <CheckCircle2 className="w-6 h-6" />
+                </div>
+                <div className="text-center space-y-1.5">
+                  <h3 className="font-extrabold text-base text-slate-100">Destination Reached</h3>
+                  <div className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-400 font-semibold text-xs">
+                    <MapPin className="w-3.5 h-3.5" /> Within {distanceToDestination ? distanceToDestination.toFixed(2) : '1.0'} km of drop-off
+                  </div>
+                  <p className="text-xs text-slate-400 pt-1">
+                    Arrived at <strong className="text-slate-200">{activeTrip?.destination || 'Destination Hub'}</strong>. Confirm to commit <span className="text-emerald-400 font-bold">{distanceKm} km</span> and finalize run.
+                  </p>
+                </div>
+              </>
+            ) : (
+              // Case 2: Ending Before Destination (Early Termination Warning)
+              <>
+                <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center mx-auto">
+                  <AlertTriangle className="w-6 h-6 text-amber-400 animate-pulse" />
+                </div>
+                <div className="text-center space-y-1.5">
+                  <h3 className="font-extrabold text-base text-slate-100">Early Route Termination</h3>
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-500/15 border border-amber-500/30 rounded-xl text-amber-300 font-mono text-xs font-bold">
+                    <MapPin className="w-3.5 h-3.5 text-amber-400" />
+                    {distanceToDestination ? `${distanceToDestination.toFixed(1)} km away from destination` : 'Destination not reached'}
+                  </div>
+                  <p className="text-xs text-slate-400 pt-1">
+                    Target: <strong className="text-slate-200">{activeTrip?.destination || 'Regional Logistics Hub'}</strong>. Ending now will flag this run as an <span className="text-amber-400 font-semibold">Incomplete Route</span> in the fleet ledger.
+                  </p>
+                </div>
+
+                <div className="space-y-1 pt-1">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                    Reason for Stopping Early:
+                  </label>
+                  <select
+                    value={terminationReason}
+                    onChange={(e) => setTerminationReason(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-700/80 rounded-xl p-2.5 text-xs text-slate-200 font-medium focus:outline-none focus:border-amber-500"
+                  >
+                    <option value="Vehicle Breakdown / Mechanical Failure">Vehicle Breakdown / Mechanical Failure</option>
+                    <option value="Emergency Road Detour / Traffic Blockage">Emergency Road Detour / Traffic Blockage</option>
+                    <option value="Customer Cancellation / Consignee Refusal">Customer Cancellation / Consignee Refusal</option>
+                    <option value="Driver Shift Handover / Duty Hours Exhausted">Driver Shift Handover / Duty Hours Exhausted</option>
+                    <option value="Consignment Offloaded at Alternate Hub">Consignment Offloaded at Alternate Hub</option>
+                    <option value="Medical Emergency / Driver Sickness">Medical Emergency / Driver Sickness</option>
+                    <option value="Other Roadside Incident">Other Roadside Incident</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                    Driver Notes (Optional):
+                  </label>
+                  <input
+                    type="text"
+                    value={customReasonNotes}
+                    onChange={(e) => setCustomReasonNotes(e.target.value)}
+                    placeholder="e.g. Engine fault code / puncture at toll gate"
+                    className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              </>
+            )}
+
             <div className="flex gap-2 pt-2">
               <button
                 type="button"
@@ -530,10 +628,13 @@ export default function DriverTripPage() {
                 type="button"
                 onClick={confirmEndTrip}
                 disabled={loading}
-                className="flex-1 py-3 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-black rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-rose-600/30 transition"
+                className={`flex-1 py-3 font-black rounded-xl text-xs text-white shadow-lg transition active:scale-95 ${
+                  isNearDestination
+                    ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/30'
+                    : 'bg-gradient-to-r from-amber-600 to-rose-600 hover:from-amber-500 hover:to-rose-500 shadow-rose-600/25'
+                }`}
               >
-                <Square className="w-3.5 h-3.5 fill-white" />
-                {loading ? 'Finalizing...' : 'Confirm End Trip'}
+                {loading ? 'Submitting...' : isNearDestination ? 'Confirm Delivery' : 'Report & End Run'}
               </button>
             </div>
           </div>

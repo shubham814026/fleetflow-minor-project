@@ -98,6 +98,14 @@ export default function TripsPage() {
                     >
                       {t.status}
                     </span>
+                    {t.isEarlyTermination && (
+                      <span
+                        className="ml-1.5 px-2 py-0.5 rounded text-[10px] font-black uppercase bg-amber-500/20 text-amber-300 border border-amber-500/30 inline-block"
+                        title={t.terminationReason || 'Ended before reaching destination'}
+                      >
+                        Early End
+                      </span>
+                    )}
                   </td>
                   <td className="p-4 font-bold text-slate-100">{t.distanceKm} km</td>
                   <td className="p-4 text-amber-400">{t.idleMinutes} mins</td>

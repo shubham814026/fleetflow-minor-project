@@ -20,7 +20,10 @@ export const authMiddleware = (req, res, next) => {
       return next();
     }
     const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = decoded;
+    req.user = {
+      ...decoded,
+      id: decoded.id || decoded.userId
+    };
     next();
   } catch (err) {
     return res.status(401).json({
