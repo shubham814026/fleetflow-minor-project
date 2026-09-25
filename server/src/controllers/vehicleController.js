@@ -1,5 +1,6 @@
 import { INITIAL_VEHICLES, DEMO_UTILISATION } from '../../../client/src/api/mockData.js';
 import { mlServiceClient } from '../services/mlServiceClient.js';
+import { DRIVERS } from './driverController.js';
 
 let VEHICLES = [...INITIAL_VEHICLES];
 
@@ -52,20 +53,29 @@ export const getVehicleById = async (req, res) => {
 
 export const createVehicle = async (req, res) => {
   const body = req.body;
+  const oneYearFromNow = new Date();
+  oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
+  const defaultExpiry = oneYearFromNow.toISOString().split('T')[0];
+
   const newV = {
     id: `veh-${Date.now()}`,
     registration: body.registrationNumber || body.registration || `KA-01-XX-${Math.floor(1000 + Math.random() * 9000)}`,
     makeModel: body.makeModel || 'Tata Truck',
     type: body.type || 'Heavy Truck',
-    status: 'moving',
-    speed: 55,
-    heading: 90,
+    heading: 0,
     lat: 12.9716,
     lng: 77.5946,
     fuelLevel: 100,
     odometer: body.odometer || 1200,
+    purchaseDate: body.purchaseDate || new Date().toISOString().split('T')[0],
+    insuranceExpiry: body.insuranceExpiry || defaultExpiry,
+    pucExpiry: body.pucExpiry || defaultExpiry,
     lastGpsUpdate: new Date().toISOString(),
-    ...body
+    ...body,
+    status: body.status || 'idle',
+    speed: body.speed !== undefined ? body.speed : 0,
+    insuranceExpiry: body.insuranceExpiry || defaultExpiry,
+    pucExpiry: body.pucExpiry || defaultExpiry
   };
 
   VEHICLES.unshift(newV);
@@ -86,6 +96,55 @@ export const updateVehicleStatus = async (req, res) => {
   });
 
   return res.json({ success: true, data: updated });
+};
+
+export const reassignVehicleDriver = async (req, res) => {
+  const { id } = req.params;
+  const { driverId, driverName } = req.body;
+
+  const vehicle = VEHICLES.find((v) => v.id === id);
+  if (!vehicle) {
+    return res.status(404).json({
+      success: false,
+      error: { code: 'NOT_FOUND', message: `Vehicle ${id} not found` }
+    });
+  }
+
+  // Safety check: Vehicle cannot be moving when changing drivers
+  if (vehicle.status === 'moving') {
+    return res.status(400).json({
+      success: false,
+      error: { code: 'VEHICLE_MOVING', message: 'Driver cannot be reassigned while vehicle is moving' }
+    });
+  }
+
+  const oldDriverId = vehicle.assignedDriverId;
+
+  // Make old driver available
+  if (oldDriverId) {
+    const oldDriver = DRIVERS.find((d) => d.id === oldDriverId);
+    if (oldDriver) {
+      oldDriver.assignedVehicleId = null;
+      oldDriver.assignedVehicleReg = null;
+      oldDriver.status = 'Available';
+    }
+  }
+
+  // Assign new driver to vehicle
+  vehicle.assignedDriverId = driverId || null;
+  vehicle.assignedDriverName = driverName || null;
+
+  if (driverId) {
+    const newDriver = DRIVERS.find((d) => d.id === driverId);
+    if (newDriver) {
+      newDriver.assignedVehicleId = vehicle.id;
+      newDriver.assignedVehicleReg = vehicle.registration;
+      newDriver.status = 'Active';
+      vehicle.assignedDriverName = newDriver.name;
+    }
+  }
+
+  return res.json({ success: true, data: vehicle });
 };
 
 export const deleteVehicle = async (req, res) => {

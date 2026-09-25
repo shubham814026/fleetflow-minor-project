@@ -65,6 +65,29 @@ export const createDriver = async (req, res) => {
   return res.status(201).json({ success: true, data: newD });
 };
 
+export const updateDriverStatus = async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+
+  let updated = null;
+  DRIVERS = DRIVERS.map((d) => {
+    if (d.id === id) {
+      updated = { ...d, status };
+      return updated;
+    }
+    return d;
+  });
+
+  if (!updated) {
+    return res.status(404).json({
+      success: false,
+      error: { code: 'NOT_FOUND', message: `Driver ${id} not found` }
+    });
+  }
+
+  return res.json({ success: true, data: updated });
+};
+
 export const getSafetyMetrics = async (req, res) => {
   return res.json({
     success: true,

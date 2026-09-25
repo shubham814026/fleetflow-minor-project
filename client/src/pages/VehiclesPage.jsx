@@ -73,7 +73,7 @@ export default function VehiclesPage() {
                 <th className="p-4">Status</th>
                 <th className="p-4">Assigned Driver</th>
                 <th className="p-4">Fuel</th>
-                <th className="p-4">Insurance Expiry</th>
+                {/* <th className="p-4">Insurance Expiry</th> */}
                 <th className="p-4 text-right">Actions</th>
               </tr>
             </thead>
@@ -85,22 +85,21 @@ export default function VehiclesPage() {
                   <td className="p-4 text-slate-400">{v.type}</td>
                   <td className="p-4">
                     <span
-                      className={`px-2 py-1 rounded-lg text-[10px] font-extrabold uppercase ${
-                        v.status === 'moving'
+                      className={`px-2 py-1 rounded-lg text-[10px] font-extrabold uppercase ${v.status === 'moving'
                           ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                           : v.status === 'idle'
-                          ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                          : v.status === 'sos'
-                          ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
-                          : 'bg-slate-700/50 text-slate-400'
-                      }`}
+                            ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                            : v.status === 'sos'
+                              ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                              : 'bg-slate-700/50 text-slate-400'
+                        }`}
                     >
                       {v.status}
                     </span>
                   </td>
                   <td className="p-4 font-semibold text-slate-200">{v.assignedDriverName || 'Unassigned'}</td>
                   <td className="p-4 font-bold text-emerald-400">{v.fuelLevel}%</td>
-                  <td className="p-4 text-slate-400">{v.insuranceExpiry}</td>
+                  {/* <td className="p-4 text-slate-400">{v.insuranceExpiry}</td> */}
                   <td className="p-4 text-right space-x-2">
                     <NavLink
                       to={`/vehicles/${v.id}`}

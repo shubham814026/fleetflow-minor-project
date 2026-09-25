@@ -222,6 +222,54 @@ export const INITIAL_DRIVERS = [
       bankAccountNumber: '33419082391029',
       bankIfsc: 'IOBA0000789'
     }
+  },
+  {
+    id: 'drv-205',
+    name: 'Dharmesh Mehta',
+    email: 'dharmesh.mehta@smartfleet.ai',
+    phone: '+91 97654 32109',
+    status: 'Available',
+    assignedVehicleId: null,
+    assignedVehicleReg: null,
+    licenseExpiry: '2029-02-18',
+    experienceYears: 6,
+    safetyScore: 94,
+    totalTrips: 278,
+    rating: 4.7,
+    joinedDate: '2022-09-01',
+    sensitive: {
+      aadhaarNo: 'XXXX-XXXX-7721',
+      panNo: 'PQRS12345T',
+      licenseNumber: 'MH-1420170098231',
+      address: 'Shop 4, Market Road, Pune, MH',
+      emergencyContact: '+91 97654 00005 (Brother)',
+      bankAccountNumber: '77218901238910',
+      bankIfsc: 'ICIC0000234'
+    }
+  },
+  {
+    id: 'drv-206',
+    name: 'Pooja Sharma',
+    email: 'pooja.sharma@smartfleet.ai',
+    phone: '+91 96543 21098',
+    status: 'Available',
+    assignedVehicleId: null,
+    assignedVehicleReg: null,
+    licenseExpiry: '2028-10-12',
+    experienceYears: 4,
+    safetyScore: 91,
+    totalTrips: 165,
+    rating: 4.6,
+    joinedDate: '2023-03-10',
+    sensitive: {
+      aadhaarNo: 'XXXX-XXXX-6612',
+      panNo: 'WXYZ98765A',
+      licenseNumber: 'KA-0520190011234',
+      address: '22 Whitefield Main Rd, Bengaluru, KA',
+      emergencyContact: '+91 96543 00006 (Father)',
+      bankAccountNumber: '66128901234567',
+      bankIfsc: 'SBIN0000567'
+    }
   }
 ];
 

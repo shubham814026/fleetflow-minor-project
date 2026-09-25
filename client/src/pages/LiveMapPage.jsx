@@ -61,9 +61,30 @@ function MapRecenter({ bounds }) {
   return null;
 }
 
+// Controller component to handle global clicks outside the popup
+function MapEventsHandler() {
+  const map = useMap();
+  useEffect(() => {
+    const handleDocumentClick = (e) => {
+      if (
+        e.target.closest('.leaflet-popup') ||
+        e.target.closest('.custom-vehicle-marker') ||
+        e.target.closest('.leaflet-control')
+      ) {
+        return;
+      }
+      map.closePopup();
+    };
+    document.addEventListener('click', handleDocumentClick);
+    return () => {
+      document.removeEventListener('click', handleDocumentClick);
+    };
+  }, [map]);
+  return null;
+}
+
 export default function LiveMapPage() {
   const [vehicles, setVehicles] = useState([]);
-  const [selectedVehicle, setSelectedVehicle] = useState(null);
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
@@ -165,91 +186,107 @@ export default function LiveMapPage() {
           />
 
           {bounds.length > 0 && <MapRecenter bounds={bounds} />}
+          <MapEventsHandler />
 
           {filteredVehicles.map((veh) => (
             <Marker
               key={veh.id}
               position={[veh.lat, veh.lng]}
               icon={createVehicleIcon(veh.status, veh.heading)}
-              eventHandlers={{
-                click: () => setSelectedVehicle(veh)
-              }}
             >
               <Popup>
-                <div className="p-1 space-y-2 min-w-[200px]">
-                  <div className="flex items-center justify-between border-b border-slate-700/60 pb-1.5">
-                    <span className="font-extrabold text-xs text-amber-400">{veh.registration}</span>
+                <div className="p-1.5 space-y-2.5 min-w-[250px] text-slate-100">
+                  {/* Header: Truck Icon + Reg + Make/Model + Status */}
+                  <div className="flex items-center justify-between border-b border-slate-700/60 pb-2 gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400">
+                        <Truck className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="font-black text-sm text-amber-400 leading-tight">
+                          {veh.registration}
+                        </div>
+                        {veh.makeModel && (
+                          <div className="text-[11px] text-slate-400 font-medium">
+                            {veh.makeModel}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
                     <span
-                      className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${
+                      className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full border ${
                         veh.status === 'moving'
-                          ? 'bg-emerald-500/20 text-emerald-400'
+                          ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
                           : veh.status === 'sos'
-                          ? 'bg-rose-500/20 text-rose-400'
-                          : 'bg-amber-500/20 text-amber-400'
+                          ? 'bg-rose-500/20 text-rose-400 border-rose-500/30'
+                          : veh.status === 'geofence_violation'
+                          ? 'bg-purple-500/20 text-purple-400 border-purple-500/30'
+                          : veh.status === 'offline'
+                          ? 'bg-slate-700/30 text-slate-400 border-slate-600/30'
+                          : 'bg-amber-500/20 text-amber-400 border-amber-500/30'
                       }`}
                     >
                       {veh.status}
                     </span>
                   </div>
 
-                  <div className="text-xs space-y-1 text-slate-300">
-                    <p>
-                      Driver: <strong className="text-slate-100">{veh.assignedDriverName || 'Unassigned'}</strong>
-                    </p>
-                    <p>
-                      Speed: <strong className="text-emerald-400">{veh.speed} km/h</strong>
-                    </p>
-                    <p>
-                      Heading: <strong>{veh.heading}°</strong>
-                    </p>
-                    <p className="text-[10px] text-slate-400">
-                      Updated: {new Date(veh.lastGpsUpdate).toLocaleTimeString()}
-                    </p>
+                  {/* 2-Column Grid: Driver, Speed & Fuel */}
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800">
+                      <span className="text-[10px] text-slate-500 block uppercase font-bold tracking-wider">
+                        Driver
+                      </span>
+                      <strong className="text-slate-100 text-xs block truncate mt-0.5">
+                        {veh.assignedDriverName || 'Unassigned'}
+                      </strong>
+                    </div>
+
+                    <div className="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800">
+                      <span className="text-[10px] text-slate-500 block uppercase font-bold tracking-wider">
+                        Speed & Fuel
+                      </span>
+                      <div className="mt-0.5 flex items-center gap-1">
+                        <span className="font-black text-emerald-400 text-xs">{veh.speed} km/h</span>
+                        {veh.fuelLevel !== undefined && (
+                          <span className="text-slate-400 text-[11px]">• {veh.fuelLevel}%</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Telematics: Heading, Coordinates & Ping Time */}
+                  <div className="space-y-1.5 text-[11px] bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+                    <div className="flex items-center justify-between text-slate-300">
+                      <span className="text-slate-400 flex items-center gap-1.5">
+                        <Compass className="w-3.5 h-3.5 text-indigo-400" /> Heading:
+                      </span>
+                      <span className="font-bold text-slate-200">{veh.heading}°</span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-slate-300">
+                      <span className="text-slate-400 flex items-center gap-1.5">
+                        <Navigation className="w-3.5 h-3.5 text-cyan-400" /> Coordinates:
+                      </span>
+                      <span className="font-mono text-slate-300 text-[10px]">
+                        {Number(veh.lat).toFixed(4)}, {Number(veh.lng).toFixed(4)}
+                      </span>
+                    </div>
+
+                    {veh.lastGpsUpdate && (
+                      <div className="text-[10px] text-slate-500 pt-1 border-t border-slate-800/80 flex items-center justify-between">
+                        <span>Updated:</span>
+                        <span className="font-mono text-slate-400">
+                          {new Date(veh.lastGpsUpdate).toLocaleTimeString()}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </Popup>
             </Marker>
           ))}
         </MapContainer>
-
-        {/* Selected Vehicle Floating Overlay */}
-        {selectedVehicle && (
-          <div className="absolute bottom-4 left-4 z-20 bg-slate-900/95 border border-slate-700/80 rounded-2xl p-4 max-w-sm w-full shadow-2xl backdrop-blur-md animate-in slide-in-from-bottom duration-200">
-            <div className="flex items-center justify-between mb-3 border-b border-slate-800 pb-2">
-              <div className="flex items-center gap-2">
-                <Truck className="w-5 h-5 text-amber-400" />
-                <div>
-                  <h4 className="font-black text-sm text-slate-100">{selectedVehicle.registration}</h4>
-                  <span className="text-[10px] text-slate-400">{selectedVehicle.makeModel}</span>
-                </div>
-              </div>
-              <button
-                onClick={() => setSelectedVehicle(null)}
-                className="text-xs text-slate-400 hover:text-white font-bold"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 text-xs mb-3">
-              <div className="bg-slate-950/80 p-2 rounded-xl border border-slate-800">
-                <span className="text-[10px] text-slate-500 block">Driver</span>
-                <span className="font-bold text-slate-200">{selectedVehicle.assignedDriverName}</span>
-              </div>
-              <div className="bg-slate-950/80 p-2 rounded-xl border border-slate-800">
-                <span className="text-[10px] text-slate-500 block">Speed & Fuel</span>
-                <span className="font-bold text-emerald-400">{selectedVehicle.speed} km/h</span> • {selectedVehicle.fuelLevel}%
-              </div>
-            </div>
-
-            <div className="text-[10px] text-slate-400 flex items-center gap-2">
-              <Compass className="w-3.5 h-3.5 text-indigo-400" />
-              <span>
-                Coordinates: {selectedVehicle.lat.toFixed(4)}, {selectedVehicle.lng.toFixed(4)}
-              </span>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

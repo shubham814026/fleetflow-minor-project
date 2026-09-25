@@ -4,6 +4,7 @@ import {
   getVehicleById,
   createVehicle,
   updateVehicleStatus,
+  reassignVehicleDriver,
   deleteVehicle,
   getUtilisationMetrics
 } from '../controllers/vehicleController.js';
@@ -18,6 +19,7 @@ router.get('/', getVehicles);
 router.get('/:id', getVehicleById);
 router.post('/', createVehicle);
 router.patch('/:id/status', updateVehicleStatus);
+router.patch('/:id/driver', reassignVehicleDriver);
 router.delete('/:id', deleteVehicle);
 
 export default router;

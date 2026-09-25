@@ -67,19 +67,29 @@ export const getTripById = async (req, res) => {
 
 export const startTrip = async (req, res) => {
   const body = req.body;
+  const targetVeh = VEHICLES.find((v) => v.registration === body.vehicleReg || v.id === body.vehicleId || v.id === body.vehicleReg);
   const newTrip = {
     id: `trip-${Date.now()}`,
     tripCode: `TRP-2026-${Math.floor(1000 + Math.random() * 9000)}`,
-    vehicleReg: body.vehicleReg || 'KA-01-EQ-9042',
-    vehicleId: body.vehicleId || 'veh-101',
-    driverName: body.driverName || req.user?.name || 'Rajesh Kumar',
-    driverId: req.user?.id || req.user?.userId || 'drv-201',
+    vehicleReg: body.vehicleReg || targetVeh?.registration || 'KA-01-EQ-9042',
+    vehicleId: body.vehicleId || targetVeh?.id || 'veh-101',
+    driverName: body.driverName || req.user?.name || targetVeh?.assignedDriverName || 'Rajesh Kumar',
+    driverId: body.driverId || req.user?.id || targetVeh?.assignedDriverId || 'drv-201',
     origin: body.origin || 'Bengaluru ICD Nelamangala',
     destination: body.destination || 'Chennai Port Container Terminal',
-    startLocation: body.startLocation || { lat: 12.9716, lng: 77.5946 },
+    startLocation: body.startLocation || {
+      lat: targetVeh?.lat || 12.9716,
+      lng: targetVeh?.lng || 77.5946,
+      address: body.origin || 'Origin Hub'
+    },
+    endLocation: body.endLocation || {
+      lat: 13.0827,
+      lng: 80.2707,
+      address: body.destination || 'Destination Hub'
+    },
     status: 'In Transit',
-    distanceKm: 0,
-    durationHours: 0.1,
+    distanceKm: body.distanceKm || 0,
+    durationHours: body.durationHours || 0.1,
     idleMinutes: 0,
     startTime: new Date().toISOString(),
     endTime: null,
@@ -89,17 +99,19 @@ export const startTrip = async (req, res) => {
 
   TRIPS.unshift(newTrip);
 
+  if (targetVeh) {
+    targetVeh.status = 'moving';
+    targetVeh.lastGpsUpdate = new Date().toISOString();
+  }
+
   // If driver GPS coordinates provided, anchor geofence to their exact location
   if (newTrip.startLocation?.lat != null && newTrip.startLocation?.lng != null) {
     const sLat = Number(newTrip.startLocation.lat);
     const sLng = Number(newTrip.startLocation.lng);
 
-    const targetVeh = VEHICLES.find((v) => v.registration === newTrip.vehicleReg || v.id === newTrip.vehicleReg);
     if (targetVeh) {
       targetVeh.lat = sLat;
       targetVeh.lng = sLng;
-      targetVeh.lastGpsUpdate = new Date().toISOString();
-      targetVeh.status = 'moving';
     }
 
     const driverGeoId = `geo-driver-${newTrip.vehicleReg}`;

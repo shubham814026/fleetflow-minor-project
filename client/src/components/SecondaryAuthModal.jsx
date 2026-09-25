@@ -100,6 +100,11 @@ export default function SecondaryAuthModal({ isOpen, onClose, onSuccess, title =
             </div>
           </div>
 
+          <div className="flex items-center justify-between text-[11px] text-slate-400 bg-slate-950/60 px-3 py-2 rounded-lg border border-slate-800">
+            <span>Authorized ID & Password:</span>
+            <span className="font-mono font-bold text-amber-400">SEC-1234 / Sec@123</span>
+          </div>
+
           <div className="flex items-center justify-end gap-3 pt-2">
             <button
               type="button"
