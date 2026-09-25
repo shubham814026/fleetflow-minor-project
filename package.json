@@ -1,0 +1,14 @@
+{
+  "name": "fleetflow-workspace",
+  "version": "1.0.0",
+  "private": true,
+  "description": "FleetFlow / SmartFleet AI Monorepo Workspace",
+  "scripts": {
+    "dev": "./start.sh all",
+    "start": "./start.sh all",
+    "ml:start": ".venv/bin/python ml_service/start_service.py",
+    "ml:test": ".venv/bin/python ml_service/test_inference.py",
+    "server:dev": "cd server && npm run dev",
+    "client:dev": "cd client && npm run dev"
+  }
+}

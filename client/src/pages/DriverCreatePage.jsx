@@ -1,91 +1,88 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '../services/api';
-import { useToast } from '../context/ToastContext';
-import Button from '../components/ui/Button';
-import Card from '../components/ui/Card';
-import FloatingInput from '../components/ui/FloatingInput';
-import FloatingSelect from '../components/ui/FloatingSelect';
+import { Users, ArrowLeft } from 'lucide-react';
+import { driverApi } from '../api';
 
-const initialForm = {
-  name: '',
-  licenseNumber: '',
-  licenseExpiryDate: '',
-  status: '',
-  safetyScore: ''
-};
-
-const DriverCreatePage = () => {
+export default function DriverCreatePage() {
   const navigate = useNavigate();
-  const toast = useToast();
-  const [form, setForm] = useState(initialForm);
-  const [submitting, setSubmitting] = useState(false);
+  const [form, setForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    licenseExpiry: '2028-12-31'
+  });
+  const [loading, setLoading] = useState(false);
 
-  const createDriver = async (event) => {
-    event.preventDefault();
-    setSubmitting(true);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
     try {
-      const payload = {
-        name: form.name,
-        licenseNumber: form.licenseNumber,
-        licenseExpiryDate: new Date(form.licenseExpiryDate),
-        safetyScore: Number(form.safetyScore || 100)
-      };
-
-      if (form.status) {
-        payload.status = form.status;
-      }
-
-      await api.post('/drivers', {
-        ...payload
-      });
-      toast.success('Driver created');
-      setForm(initialForm);
+      await driverApi.create(form);
       navigate('/drivers');
-    } catch (error) {
-      toast.error(error?.response?.data?.message || 'Failed to create driver');
+    } catch (err) {
+      console.error(err);
     } finally {
-      setSubmitting(false);
+      setLoading(false);
     }
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="section-title">Add Driver</h1>
-          <p className="section-subtitle">Create a new driver profile</p>
-        </div>
-        <Button variant="secondary" onClick={() => navigate('/drivers')}>
-          Back to Drivers
-        </Button>
-      </div>
+    <div className="space-y-6 max-w-2xl">
+      <button onClick={() => navigate('/drivers')} className="text-xs text-slate-400 hover:text-white flex items-center gap-1 font-semibold">
+        <ArrowLeft className="w-4 h-4" /> Back to Drivers
+      </button>
 
-      <Card>
-        <form onSubmit={createDriver} className="grid gap-3 md:grid-cols-3">
-          <FloatingInput label="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-          <FloatingInput label="License Number" value={form.licenseNumber} onChange={(e) => setForm({ ...form, licenseNumber: e.target.value })} required />
-          <FloatingInput type="date" label="License Expiry" value={form.licenseExpiryDate} onChange={(e) => setForm({ ...form, licenseExpiryDate: e.target.value })} required />
-          <FloatingSelect
-            label="Status"
-            placeholder="Select Status (optional)"
-            value={form.status}
-            onChange={(e) => setForm({ ...form, status: e.target.value })}
-          >
-            <option>On Duty</option>
-            <option>Off Duty</option>
-            <option>Suspended</option>
-          </FloatingSelect>
-          <FloatingInput type="number" min="0" max="100" label="Safety Score" value={form.safetyScore} onChange={(e) => setForm({ ...form, safetyScore: e.target.value })} />
-          <div className="flex items-end">
-            <Button className="w-full" disabled={submitting}>
-              {submitting ? 'Adding...' : 'Add Driver'}
-            </Button>
+      <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl space-y-4">
+        <h1 className="text-xl font-black text-slate-100 flex items-center gap-2">
+          <Users className="w-6 h-6 text-amber-400" /> Onboard New Driver
+        </h1>
+
+        <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+          <div>
+            <label className="block text-slate-300 mb-1">Full Name</label>
+            <input
+              type="text"
+              required
+              placeholder="e.g. Vikram Sharma"
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-slate-100"
+            />
           </div>
+
+          <div>
+            <label className="block text-slate-300 mb-1">Email Address</label>
+            <input
+              type="email"
+              required
+              placeholder="vikram@smartfleet.ai"
+              value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-slate-100"
+            />
+          </div>
+
+          <div>
+            <label className="block text-slate-300 mb-1">Phone Number</label>
+            <input
+              type="text"
+              required
+              placeholder="+91 98765 11122"
+              value={form.phone}
+              onChange={(e) => setForm({ ...form, phone: e.target.value })}
+              className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-slate-100"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs transition-all shadow-lg shadow-amber-500/20"
+          >
+            {loading ? 'Submitting...' : 'Onboard Driver'}
+          </button>
         </form>
-      </Card>
+      </div>
     </div>
   );
-};
-
-export default DriverCreatePage;
+}

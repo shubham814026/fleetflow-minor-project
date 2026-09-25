@@ -1,0 +1,297 @@
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  SUPER_ADMIN
+  SUB_ADMIN
+  DRIVER
+  ACCOUNTANT
+}
+
+enum GeofenceType {
+  PERMITTED
+  RESTRICTED
+}
+
+enum AlertSeverity {
+  Critical
+  High
+  Medium
+  Low
+}
+
+enum AlertStatus {
+  Open
+  Reviewed
+  Resolved
+}
+
+enum SalaryStatus {
+  CREDITED
+  PENDING
+  FAILED
+}
+
+model User {
+  id                  String               @id @default(uuid())
+  name                String
+  email               String               @unique
+  passwordHash        String
+  role                Role                 @default(SUPER_ADMIN)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  secondaryCredential SecondaryCredential?
+  auditLogs           AuditLog[]
+}
+
+model SecondaryCredential {
+  id                    String    @id @default(uuid())
+  userId                String    @unique
+  secondaryId           String    @unique
+  secondaryPasswordHash String
+  failedAttempts        Int       @default(0)
+  lockedUntil           DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Vehicle {
+  id                 String    @id @default(uuid())
+  registrationNumber String    @unique
+  makeModel          String
+  type               String
+  status             String    @default("moving")
+  speed              Float     @default(0)
+  heading            Float     @default(0)
+  lat                Float     @default(12.9716)
+  lng                Float     @default(77.5946)
+  fuelLevel          Float     @default(100)
+  odometer           Float     @default(0)
+  purchaseDate       String?
+  insuranceExpiry    String?
+  pucExpiry          String?
+  assignedDriverId   String?
+  lastGpsAt          DateTime?
+  chassisNumber      String?
+  engineNumber       String?
+  rcNumber           String?
+  insurancePolicyNo  String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  trips              Trip[]
+  gpsLogs            GPSLog[]
+  fuelLogs           FuelLog[]
+}
+
+model Driver {
+  id                String         @id @default(uuid())
+  userId            String?        @unique
+  name              String
+  email             String         @unique
+  phone             String
+  status            String         @default("Active")
+  assignedVehicleId String?
+  licenseNumber     String?
+  licenseExpiry     String?
+  experienceYears   Int            @default(3)
+  safetyScore       Float          @default(90)
+  totalTrips        Int            @default(0)
+  rating            Float          @default(4.8)
+  aadhaarNo         String?
+  panNo             String?
+  address           String?
+  emergencyContact  String?
+  bankAccountNumber String?
+  bankIfsc          String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  trips             Trip[]
+  gpsLogs           GPSLog[]
+  salaries          SalaryRecord[]
+}
+
+model SubAdminAssignment {
+  id         String   @id @default(uuid())
+  subAdminId String
+  driverId   String?
+  vehicleId  String?
+  createdAt  DateTime @default(now())
+}
+
+model Trip {
+  id                 String    @id @default(uuid())
+  tripCode           String    @unique
+  vehicleId          String
+  driverId           String
+  origin             String
+  destination        String
+  startLat           Float
+  startLng           Float
+  endLat             Float?
+  endLng             Float?
+  status             String    @default("In Transit")
+  distanceKm         Float     @default(0)
+  durationHours      Float     @default(0)
+  idleMinutes        Int       @default(0)
+  startTime          DateTime  @default(now())
+  endTime            DateTime?
+  avgSpeed           Float     @default(0)
+  fuelConsumedLitres Float     @default(0)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  vehicle            Vehicle   @relation(fields: [vehicleId], references: [id])
+  driver             Driver    @relation(fields: [driverId], references: [id])
+  gpsLogs            GPSLog[]
+}
+
+model GPSLog {
+  id        String   @id @default(uuid())
+  tripId    String
+  vehicleId String
+  driverId  String
+  latitude  Float
+  longitude Float
+  speed     Float    @default(0)
+  heading   Float    @default(0)
+  accuracy  Float    @default(5)
+  timestamp DateTime @default(now())
+  synced    Boolean  @default(true)
+  vehicle   Vehicle  @relation(fields: [vehicleId], references: [id])
+  driver    Driver   @relation(fields: [driverId], references: [id])
+  trip      Trip     @relation(fields: [tripId], references: [id])
+
+  @@index([tripId])
+  @@index([vehicleId])
+  @@index([timestamp])
+}
+
+model Geofence {
+  id           String              @id @default(uuid())
+  name         String
+  type         GeofenceType        @default(PERMITTED)
+  centerLat    Float
+  centerLng    Float
+  radiusMeters Float               @default(5000)
+  severity     String              @default("Medium")
+  active       Boolean             @default(true)
+  createdAt    DateTime            @default(now())
+  violations   GeofenceViolation[]
+}
+
+model GeofenceViolation {
+  id         String   @id @default(uuid())
+  geofenceId String
+  vehicleId  String
+  driverId   String
+  timestamp  DateTime @default(now())
+  geofence   Geofence @relation(fields: [geofenceId], references: [id])
+}
+
+model Alert {
+  id          String        @id @default(uuid())
+  category    String
+  severity    AlertSeverity @default(Medium)
+  vehicleReg  String
+  driverName  String
+  description String
+  status      AlertStatus   @default(Open)
+  timestamp   DateTime      @default(now())
+  createdAt   DateTime      @default(now())
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+model SOSAlert {
+  id        String   @id @default(uuid())
+  driverId  String
+  vehicleId String
+  lat       Float
+  lng       Float
+  status    String   @default("Active")
+  timestamp DateTime @default(now())
+}
+
+model FuelLog {
+  id        String   @id @default(uuid())
+  vehicleId String
+  date      DateTime @default(now())
+  litres    Float
+  cost      Float
+  odometer  Float
+  vehicle   Vehicle  @relation(fields: [vehicleId], references: [id])
+
+  @@index([vehicleId])
+}
+
+model MLInsight {
+  id               String   @id @default(uuid())
+  category         String
+  title            String
+  vehicleReg       String
+  description      String
+  potentialSavings String?
+  riskScore        Float?
+  createdAt        DateTime @default(now())
+}
+
+model MaintenanceRecord {
+  id              String   @id @default(uuid())
+  vehicleReg      String
+  serviceType     String
+  lastServiceDate String
+  nextServiceDate String
+  odometer        Float
+  status          String   @default("Due")
+  createdAt       DateTime @default(now())
+}
+
+model Document {
+  id         String   @id @default(uuid())
+  title      String
+  type       String
+  entity     String
+  issueDate  String?
+  expiryDate String
+  status     String   @default("Valid")
+  createdAt  DateTime @default(now())
+
+  @@index([expiryDate])
+}
+
+model SalaryRecord {
+  id         String       @id @default(uuid())
+  driverId   String
+  driverName String
+  month      String
+  amount     Float
+  due        String
+  status     SalaryStatus @default(PENDING)
+  txnId      String?
+  createdAt  DateTime     @default(now())
+  driver     Driver       @relation(fields: [driverId], references: [id])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?
+  userEmail  String
+  userRole   String
+  action     String
+  targetType String?
+  targetId   String?
+  ip         String   @default("127.0.0.1")
+  timestamp  DateTime @default(now())
+  user       User?    @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([timestamp])
+}
