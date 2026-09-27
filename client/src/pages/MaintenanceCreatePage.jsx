@@ -25,7 +25,10 @@ const MaintenanceCreatePage = () => {
   const [submitting, setSubmitting] = useState(false);
 
   const serviceableVehicles = useMemo(
-    () => vehicles.filter((vehicle) => vehicle.status !== 'On Trip' && vehicle.status !== 'Out of Service'),
+    () => (Array.isArray(vehicles) ? vehicles : []).filter((vehicle) => {
+      const s = (vehicle.status || '').toLowerCase();
+      return s !== 'on trip' && s !== 'on_trip' && s !== 'out of service' && s !== 'out_of_service';
+    }),
     [vehicles]
   );
 
@@ -33,8 +36,16 @@ const MaintenanceCreatePage = () => {
     const fetchVehicles = async () => {
       setLoading(true);
       try {
-        const { data } = await api.get('/vehicles');
-        setVehicles(data);
+        const res = await api.get('/vehicles');
+        const list = Array.isArray(res.data) ? res.data : Array.isArray(res.data?.data) ? res.data.data : [];
+        setVehicles(list);
+        if (list.length > 0) {
+          const firstAvailable = list.find((v) => {
+            const s = (v.status || '').toLowerCase();
+            return s !== 'on trip' && s !== 'on_trip' && s !== 'out of service' && s !== 'out_of_service';
+          }) || list[0];
+          setForm((prev) => ({ ...prev, vehicle: firstAvailable.id || firstAvailable._id || firstAvailable.registration || firstAvailable.registrationNumber }));
+        }
       } catch (error) {
         toast.error(error?.response?.data?.message || 'Failed to load vehicles');
       } finally {
@@ -49,16 +60,21 @@ const MaintenanceCreatePage = () => {
     event.preventDefault();
     setSubmitting(true);
     try {
+      const selectedVeh = vehicles.find((v) => v.id === form.vehicle || v._id === form.vehicle || v.registration === form.vehicle || v.registrationNumber === form.vehicle);
+
       await api.post('/maintenance', {
-        ...form,
+        vehicleId: selectedVeh?.id || form.vehicle,
+        vehicleReg: selectedVeh?.registration || selectedVeh?.registrationNumber,
+        serviceType: form.serviceType,
+        notes: form.notes,
         cost: Number(form.cost),
-        serviceDate: new Date(form.serviceDate)
+        serviceDate: form.serviceDate ? new Date(form.serviceDate).toISOString() : new Date().toISOString()
       });
       toast.success('Maintenance log created and vehicle moved to shop');
       setForm(initialForm);
       navigate('/maintenance');
     } catch (error) {
-      toast.error(error?.response?.data?.message || 'Failed to create maintenance log');
+      toast.error(error?.response?.data?.message || 'Failed to add maintenance log');
     } finally {
       setSubmitting(false);
     }
@@ -84,8 +100,8 @@ const MaintenanceCreatePage = () => {
             <FloatingSelect label="Vehicle" value={form.vehicle} onChange={(e) => setForm({ ...form, vehicle: e.target.value })} required>
               <option value="">Select Vehicle</option>
               {serviceableVehicles.map((vehicle) => (
-                <option key={vehicle._id} value={vehicle._id}>
-                  {vehicle.model} ({vehicle.licensePlate})
+                <option key={vehicle.id || vehicle._id} value={vehicle.id || vehicle._id}>
+                  {vehicle.registration || vehicle.registrationNumber || vehicle.licensePlate || 'Vehicle'} - {vehicle.makeModel || vehicle.model || 'Truck'}
                 </option>
               ))}
             </FloatingSelect>
