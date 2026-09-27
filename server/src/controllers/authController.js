@@ -52,7 +52,8 @@ let USERS = [
 
 let SECONDARY_CREDENTIALS = {
   'SEC-1234': {
-    passwordHash: bcrypt.hashSync('admin123', 10),
+    passwordHash: bcrypt.hashSync('Sec@123', 10),
+    secondaryPasswords: ['Sec@123', 'admin123'],
     failedAttempts: 0,
     lockedUntil: null
   }
@@ -142,7 +143,10 @@ export const verifySecondaryAuth = async (req, res) => {
   }
 
   const cred = SECONDARY_CREDENTIALS[secondaryId];
-  const isMatch = cred ? bcrypt.compareSync(secondaryPassword, cred.passwordHash) : secondaryPassword.length >= 3;
+  const isMatch = cred && (
+    (cred.secondaryPasswords && cred.secondaryPasswords.includes(secondaryPassword)) ||
+    bcrypt.compareSync(secondaryPassword, cred.passwordHash)
+  );
 
   if (!isMatch) {
     logAuditEvent({

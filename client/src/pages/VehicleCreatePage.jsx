@@ -3,6 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { Truck, ArrowLeft } from 'lucide-react';
 import { vehicleApi } from '../api';
 
+const getOneYearFromNow = () => {
+  const d = new Date();
+  d.setFullYear(d.getFullYear() + 1);
+  return d.toISOString().split('T')[0];
+};
+
 export default function VehicleCreatePage() {
   const navigate = useNavigate();
   const [form, setForm] = useState({
@@ -10,7 +16,11 @@ export default function VehicleCreatePage() {
     makeModel: '',
     type: 'Heavy Truck',
     fuelLevel: 100,
-    odometer: 0
+    odometer: 0,
+    status: 'idle',
+    speed: 0,
+    insuranceExpiry: getOneYearFromNow(),
+    pucExpiry: getOneYearFromNow()
   });
   const [loading, setLoading] = useState(false);
 
@@ -75,6 +85,36 @@ export default function VehicleCreatePage() {
               <option value="Medium Duty Truck">Medium Duty Truck</option>
               <option value="Trailer">Trailer</option>
             </select>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-slate-300 mb-1 flex items-center justify-between">
+                <span>Insurance Expiry</span>
+                <span className="text-[10px] text-amber-400 font-semibold">+1 Year Default</span>
+              </label>
+              <input
+                type="date"
+                required
+                value={form.insuranceExpiry}
+                onChange={(e) => setForm({ ...form, insuranceExpiry: e.target.value })}
+                className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-slate-100"
+              />
+            </div>
+
+            <div>
+              <label className="block text-slate-300 mb-1 flex items-center justify-between">
+                <span>PUC Expiry</span>
+                <span className="text-[10px] text-amber-400 font-semibold">+1 Year Default</span>
+              </label>
+              <input
+                type="date"
+                required
+                value={form.pucExpiry}
+                onChange={(e) => setForm({ ...form, pucExpiry: e.target.value })}
+                className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-slate-100"
+              />
+            </div>
           </div>
 
           <button

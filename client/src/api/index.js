@@ -89,8 +89,24 @@ export const vehicleApi = {
   },
 
   create: async (vehicleData) => {
+    const oneYearFromNow = new Date();
+    oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
+    const defaultExpiry = oneYearFromNow.toISOString().split('T')[0];
+
     try {
-      const res = await apiClient.post('/vehicles', vehicleData);
+      const payload = {
+        status: 'idle',
+        speed: 0,
+        heading: 0,
+        insuranceExpiry: defaultExpiry,
+        pucExpiry: defaultExpiry,
+        purchaseDate: new Date().toISOString().split('T')[0],
+        ...vehicleData
+      };
+      if (!payload.insuranceExpiry) payload.insuranceExpiry = defaultExpiry;
+      if (!payload.pucExpiry) payload.pucExpiry = defaultExpiry;
+
+      const res = await apiClient.post('/vehicles', payload);
       const created = res.data?.data || res.data;
       mockVehicles.unshift(created);
       return created;
@@ -98,16 +114,23 @@ export const vehicleApi = {
       await delay();
       const newV = {
         id: `veh-${Date.now()}`,
-        status: 'moving',
+        status: 'idle',
         lat: 12.9716 + (Math.random() - 0.5) * 0.1,
         lng: 77.5946 + (Math.random() - 0.5) * 0.1,
-        speed: 45,
-        heading: 90,
+        speed: 0,
+        heading: 0,
         fuelLevel: 100,
         odometer: 1000,
+        purchaseDate: new Date().toISOString().split('T')[0],
+        insuranceExpiry: defaultExpiry,
+        pucExpiry: defaultExpiry,
         lastGpsUpdate: new Date().toISOString(),
-        ...vehicleData
+        ...vehicleData,
+        status: vehicleData?.status || 'idle',
+        speed: vehicleData?.speed !== undefined ? vehicleData.speed : 0
       };
+      if (!newV.insuranceExpiry) newV.insuranceExpiry = defaultExpiry;
+      if (!newV.pucExpiry) newV.pucExpiry = defaultExpiry;
       mockVehicles.unshift(newV);
       return newV;
     }
@@ -121,6 +144,45 @@ export const vehicleApi = {
       await delay();
       mockVehicles = mockVehicles.map((v) => (v.id === id ? { ...v, status } : v));
       return { id, status };
+    }
+  },
+
+  assignDriver: async (id, { driverId, driverName }) => {
+    try {
+      const res = await apiClient.patch(`/vehicles/${id}/driver`, { driverId, driverName });
+      const updated = res.data?.data || res.data;
+      mockVehicles = mockVehicles.map((v) => (v.id === id ? { ...v, ...updated } : v));
+      return updated;
+    } catch (e) {
+      await delay();
+      let updatedVeh = null;
+      mockVehicles = mockVehicles.map((v) => {
+        if (v.id === id) {
+          const oldDriverId = v.assignedDriverId;
+          if (oldDriverId) {
+            mockDrivers = mockDrivers.map((d) =>
+              d.id === oldDriverId
+                ? { ...d, assignedVehicleId: null, assignedVehicleReg: null, status: 'Available' }
+                : d
+            );
+          }
+          if (driverId) {
+            mockDrivers = mockDrivers.map((d) =>
+              d.id === driverId
+                ? { ...d, assignedVehicleId: v.id, assignedVehicleReg: v.registration, status: 'Active' }
+                : d
+            );
+          }
+          updatedVeh = {
+            ...v,
+            assignedDriverId: driverId || null,
+            assignedDriverName: driverName || null
+          };
+          return updatedVeh;
+        }
+        return v;
+      });
+      return updatedVeh || { id, assignedDriverId: driverId, assignedDriverName: driverName };
     }
   },
 
@@ -177,6 +239,19 @@ export const driverApi = {
       };
       mockDrivers.unshift(newD);
       return newD;
+    }
+  },
+
+  updateStatus: async (id, status) => {
+    try {
+      const res = await apiClient.patch(`/drivers/${id}/status`, { status });
+      const updated = res.data?.data || res.data;
+      mockDrivers = mockDrivers.map((d) => (d.id === id ? { ...d, status } : d));
+      return updated;
+    } catch (e) {
+      await delay();
+      mockDrivers = mockDrivers.map((d) => (d.id === id ? { ...d, status } : d));
+      return { id, status };
     }
   },
 
@@ -245,7 +320,7 @@ export const tripApi = {
       mockTrips.unshift(created);
       try {
         localStorage.setItem('fleetflow_active_trip', JSON.stringify(created));
-      } catch (err) {}
+      } catch (err) { }
       return created;
     } catch (e) {
       await delay();
@@ -265,7 +340,7 @@ export const tripApi = {
       mockTrips.unshift(newTrip);
       try {
         localStorage.setItem('fleetflow_active_trip', JSON.stringify(newTrip));
-      } catch (err) {}
+      } catch (err) { }
       return newTrip;
     }
   },
@@ -281,25 +356,25 @@ export const tripApi = {
         localStorage.removeItem('fleetflow_active_trip');
         localStorage.removeItem('fleetflow_trip_path');
         window.dispatchEvent(new Event('fleetflow_trip_ended'));
-      } catch (err) {}
+      } catch (err) { }
       return updated;
     } catch (e) {
       await delay();
       mockTrips = mockTrips.map((t) =>
         t.id === id || t.tripCode === id
           ? {
-              ...t,
-              status: 'Completed',
-              endTime: new Date().toISOString(),
-              ...summaryData
-            }
+            ...t,
+            status: 'Completed',
+            endTime: new Date().toISOString(),
+            ...summaryData
+          }
           : t
       );
       try {
         localStorage.removeItem('fleetflow_active_trip');
         localStorage.removeItem('fleetflow_trip_path');
         window.dispatchEvent(new Event('fleetflow_trip_ended'));
-      } catch (err) {}
+      } catch (err) { }
       return { id, status: 'Completed', ...summaryData };
     }
   }

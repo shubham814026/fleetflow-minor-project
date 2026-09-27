@@ -1,6 +1,7 @@
 import { INITIAL_VEHICLES, DEMO_UTILISATION } from '../../../client/src/api/mockData.js';
 import { mlServiceClient } from '../services/mlServiceClient.js';
 import prisma from '../repositories/store.js';
+import { DRIVERS } from './driverController.js';
 
 let VEHICLES = [...INITIAL_VEHICLES];
 
@@ -159,6 +160,9 @@ export const getVehicleById = async (req, res) => {
 export const createVehicle = async (req, res) => {
   const body = req.body;
   const reg = (body.registrationNumber || body.registration || `KA-01-SF-${Math.floor(1000 + Math.random() * 9000)}`).trim();
+  const oneYearFromNow = new Date();
+  oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
+  const defaultExpiry = oneYearFromNow.toISOString().split('T')[0];
 
   try {
     let owner = await prisma.owners.findFirst();
@@ -262,6 +266,91 @@ export const toggleOutOfService = async (req, res) => {
   }
 
   return updateVehicleStatus(req, res);
+};
+
+export const reassignVehicleDriver = async (req, res) => {
+  const { id } = req.params;
+  const { driverId, driverName } = req.body;
+
+  let vehicle = VEHICLES.find((v) => v.id === id || v.registration === id);
+
+  try {
+    const isUuid = typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    const where = isUuid ? { id } : { registration_number: id };
+    const dbVeh = await prisma.vehicles.findUnique({
+      where,
+      include: {
+        driver_vehicle: {
+          include: {
+            drivers: { include: { users: true } }
+          }
+        }
+      }
+    });
+
+    if (dbVeh) {
+      if (!vehicle) {
+        vehicle = formatVehicle(dbVeh);
+        VEHICLES.unshift(vehicle);
+      }
+
+      const isDriverUuid = typeof driverId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(driverId);
+      if (isDriverUuid) {
+        await prisma.driver_vehicle.deleteMany({ where: { vehicle_id: dbVeh.id } });
+        await prisma.driver_vehicle.create({
+          data: {
+            vehicle_id: dbVeh.id,
+            driver_id: driverId
+          }
+        });
+      }
+    }
+  } catch (err) {
+    console.warn('Prisma reassignVehicleDriver error:', err.message);
+  }
+
+  if (!vehicle) {
+    return res.status(404).json({
+      success: false,
+      error: { code: 'NOT_FOUND', message: `Vehicle ${id} not found` }
+    });
+  }
+
+  // Safety check: Vehicle cannot be moving when changing drivers
+  if (vehicle.status === 'moving' || vehicle.status === 'on_trip') {
+    return res.status(400).json({
+      success: false,
+      error: { code: 'VEHICLE_MOVING', message: 'Driver cannot be reassigned while vehicle is moving' }
+    });
+  }
+
+  const oldDriverId = vehicle.assignedDriverId;
+
+  // Make old driver available
+  if (oldDriverId) {
+    const oldDriver = DRIVERS.find((d) => d.id === oldDriverId);
+    if (oldDriver) {
+      oldDriver.assignedVehicleId = null;
+      oldDriver.assignedVehicleReg = null;
+      oldDriver.status = 'Available';
+    }
+  }
+
+  // Assign new driver to vehicle
+  vehicle.assignedDriverId = driverId || null;
+  vehicle.assignedDriverName = driverName || null;
+
+  if (driverId) {
+    const newDriver = DRIVERS.find((d) => d.id === driverId);
+    if (newDriver) {
+      newDriver.assignedVehicleId = vehicle.id;
+      newDriver.assignedVehicleReg = vehicle.registration;
+      newDriver.status = 'Active';
+      vehicle.assignedDriverName = newDriver.name;
+    }
+  }
+
+  return res.json({ success: true, data: vehicle });
 };
 
 export const deleteVehicle = async (req, res) => {
