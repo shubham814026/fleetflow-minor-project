@@ -94,7 +94,7 @@ const MaintenanceCreatePage = () => {
             <FloatingInput type="number" min="0" label="Cost" value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} required />
             <FloatingInput className="md:col-span-2" label="Notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
             <div className="flex items-end">
-              <Button className="w-full" disabled={submitting}>
+              <Button type="submit" className="w-full" disabled={submitting}>
                 {submitting ? 'Adding...' : 'Add to Service'}
               </Button>
             </div>

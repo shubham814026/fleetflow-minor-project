@@ -31,7 +31,7 @@ const FuelCreatePage = () => {
         const list = Array.isArray(res.data) ? res.data : Array.isArray(res.data?.data) ? res.data.data : [];
         setVehicles(list);
         if (list.length > 0) {
-          setForm((prev) => ({ ...prev, vehicle: list[0].registration || list[0].registrationNumber || list[0].id }));
+          setForm((prev) => ({ ...prev, vehicle: list[0].id || list[0].registration || list[0].registrationNumber }));
         }
       } catch (error) {
         toast.error(error?.response?.data?.message || 'Failed to load vehicles');
@@ -47,9 +47,13 @@ const FuelCreatePage = () => {
     event.preventDefault();
     setSubmitting(true);
     try {
+      const selectedVeh = vehicles.find(
+        (v) => v.id === form.vehicle || v.registration === form.vehicle || v.registrationNumber === form.vehicle
+      );
+
       await api.post('/fuel', {
-        vehicleId: form.vehicle,
-        vehicleReg: form.vehicle,
+        vehicleId: selectedVeh?.id || form.vehicle,
+        vehicleReg: selectedVeh?.registration || selectedVeh?.registrationNumber || form.vehicle,
         litres: Number(form.liters),
         cost: Number(form.cost),
         date: form.date ? new Date(form.date).toISOString() : new Date().toISOString()
@@ -84,7 +88,7 @@ const FuelCreatePage = () => {
             <FloatingSelect label="Vehicle" value={form.vehicle} onChange={(e) => setForm({ ...form, vehicle: e.target.value })} required>
               <option value="">Select Vehicle</option>
               {vehicles.map((v) => (
-                <option key={v.id || v._id} value={v.registration || v.registrationNumber || v.id}>
+                <option key={v.id || v._id} value={v.id || v.registration || v.registrationNumber}>
                   {v.registration || v.registrationNumber} - {v.makeModel || v.model || 'Truck'}
                 </option>
               ))}
@@ -93,7 +97,7 @@ const FuelCreatePage = () => {
             <FloatingInput type="number" min="0" step="0.01" label="Cost" value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} required />
             <FloatingInput type="date" label="Date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
             <div className="md:col-span-4 flex justify-end">
-              <Button disabled={submitting}>{submitting ? 'Adding...' : 'Add Fuel Record'}</Button>
+              <Button type="submit" disabled={submitting}>{submitting ? 'Adding...' : 'Add Fuel Record'}</Button>
             </div>
           </form>
         </Card>

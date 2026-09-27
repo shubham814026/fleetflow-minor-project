@@ -91,13 +91,20 @@ export const addFuelLog = async (req, res) => {
     }
 
     if (veh) {
+      const dateVal = body.date ? new Date(body.date) : new Date();
+      const litersVal = Number(body.litres || body.liters || 50);
+      const costVal = Number(body.cost || 4800);
+      const pricePerLiter = litersVal > 0 ? parseFloat((costVal / litersVal).toFixed(2)) : null;
+
       const created = await prisma.fuel_logs.create({
         data: {
           vehicle_id: veh.id,
-          liters: Number(body.litres || body.liters || 50),
-          cost: Number(body.cost || 4800),
-          odometer: Number(body.odometer || 142500),
-          fuel_station: body.fuelStation || 'IndianOil Fleet Hub'
+          liters: litersVal,
+          cost: costVal,
+          price_per_liter: pricePerLiter,
+          odometer: Number(body.odometer || veh.odometer || 142500),
+          fuel_station: body.fuelStation || 'IndianOil Fleet Hub',
+          created_at: !isNaN(dateVal.getTime()) ? dateVal : new Date()
         }
       });
       return res.status(201).json({
@@ -105,9 +112,11 @@ export const addFuelLog = async (req, res) => {
         data: {
           id: created.id,
           vehicleId: created.vehicle_id,
-          date: created.created_at,
+          vehicleReg: veh.registration_number,
+          date: created.created_at ? new Date(created.created_at).toISOString().split('T')[0] : '2026-09-27',
           litres: Number(created.liters),
           cost: Number(created.cost),
+          pricePerLiter: Number(created.price_per_liter || 0),
           odometer: Number(created.odometer)
         }
       });
@@ -119,10 +128,12 @@ export const addFuelLog = async (req, res) => {
   const newLog = {
     id: `fuel-${Date.now()}`,
     vehicleId: body.vehicleId || 'veh-101',
-    date: body.date || new Date().toISOString(),
-    litres: body.litres || 50,
-    cost: body.cost || 4800,
-    odometer: body.odometer || 142500
+    vehicleReg: body.vehicleReg || 'KA-01-EQ-9042',
+    date: body.date || new Date().toISOString().split('T')[0],
+    litres: Number(body.litres || body.liters || 50),
+    cost: Number(body.cost || 4800),
+    odometer: Number(body.odometer || 142500),
+    fuelStation: body.fuelStation || 'Fleet Station'
   };
 
   return res.status(201).json({ success: true, data: newLog });
