@@ -3,6 +3,8 @@ import prisma from '../repositories/store.js';
 
 let DRIVERS = [...INITIAL_DRIVERS];
 
+const isUuid = (str) => typeof str === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+
 const formatDriver = (d) => {
   const assigned = d.driver_vehicle?.[0]?.vehicles;
   const user = d.users;
@@ -68,7 +70,7 @@ export const getDrivers = async (req, res) => {
       prisma.drivers.count({ where })
     ]);
 
-    if (dbDrivers && dbDrivers.length > 0) {
+    if (dbDrivers) {
       const formatted = dbDrivers.map(formatDriver);
       return res.json({
         success: true,
@@ -106,29 +108,31 @@ export const getDriverById = async (req, res) => {
   const { id } = req.params;
 
   try {
-    const d = await prisma.drivers.findFirst({
-      where: {
-        OR: [
-          { id: id },
-          { user_id: id }
-        ]
-      },
-      include: {
-        users: true,
-        driver_vehicle: {
-          take: 1,
-          include: { vehicles: true }
+    if (isUuid(id)) {
+      const d = await prisma.drivers.findFirst({
+        where: {
+          OR: [
+            { id: id },
+            { user_id: id }
+          ]
+        },
+        include: {
+          users: true,
+          driver_vehicle: {
+            take: 1,
+            include: { vehicles: true }
+          }
         }
-      }
-    });
+      });
 
-    if (d) {
-      const formatted = formatDriver(d);
-      const hasSecondaryAuth = Boolean(req.headers['x-secondary-auth']);
-      if (!hasSecondaryAuth) {
-        delete formatted.sensitive;
+      if (d) {
+        const formatted = formatDriver(d);
+        const hasSecondaryAuth = Boolean(req.headers['x-secondary-auth']);
+        if (!hasSecondaryAuth) {
+          delete formatted.sensitive;
+        }
+        return res.json({ success: true, data: formatted });
       }
-      return res.json({ success: true, data: formatted });
     }
   } catch (err) {
     console.warn('Prisma getDriverById error, using fallback:', err.message);
@@ -155,30 +159,116 @@ export const createDriver = async (req, res) => {
   const body = req.body;
 
   try {
-    const owner = await prisma.owners.findFirst();
-    const createdUser = await prisma.users.create({
-      data: {
-        name: body.name || 'New Driver',
-        email: body.email || `driver.${Date.now()}@smartfleet.ai`,
-        password_hash: '$2b$10$syntheticseedpasswordhash',
-        role: 'DRIVER',
-        status: 'active'
+    let owner = null;
+    if (req.user?.id && isUuid(req.user.id)) {
+      owner = await prisma.owners.findFirst({ where: { user_id: req.user.id } });
+    }
+    if (!owner && req.user?.email) {
+      const loggedInUser = await prisma.users.findUnique({ where: { email: req.user.email } });
+      if (loggedInUser) {
+        owner = await prisma.owners.findFirst({ where: { user_id: loggedInUser.id } });
       }
-    });
+    }
+    if (!owner) {
+      owner = await prisma.owners.findFirst();
+    }
 
-    const newDbDriver = await prisma.drivers.create({
-      data: {
-        user_id: createdUser.id,
-        owner_id: owner?.id || '00000000-0000-0000-0000-000000000000',
-        contact: body.phone || '+91 98765 43210',
-        license_number: body.licenseNumber || `DL${Math.floor(10000000 + Math.random() * 90000000)}`,
-        status: 'active'
-      },
-      include: {
-        users: true,
-        driver_vehicle: { include: { vehicles: true } }
+    if (!owner) {
+      const firstUser = await prisma.users.findFirst();
+      if (firstUser) {
+        owner = await prisma.owners.create({
+          data: {
+            user_id: firstUser.id,
+            company_name: 'SmartFleet Logistics'
+          }
+        });
       }
-    });
+    }
+
+    const email = body.email || `driver.${Date.now()}@smartfleet.ai`;
+
+    // Find or create associated user
+    let user = await prisma.users.findUnique({ where: { email } });
+    if (!user) {
+      user = await prisma.users.create({
+        data: {
+          name: body.name || 'New Driver',
+          email,
+          password_hash: '$2b$10$syntheticseedpasswordhash',
+          role: 'DRIVER',
+          status: 'active'
+        }
+      });
+    } else {
+      user = await prisma.users.update({
+        where: { id: user.id },
+        data: {
+          name: body.name || user.name,
+          role: 'DRIVER',
+          status: 'active'
+        }
+      });
+    }
+
+    let licenseExpiryDate = null;
+    if (body.licenseExpiry || body.licenseExpiryDate) {
+      const parsed = new Date(body.licenseExpiry || body.licenseExpiryDate);
+      if (!isNaN(parsed.getTime())) {
+        licenseExpiryDate = parsed;
+      }
+    }
+
+    let newDbDriver = await prisma.drivers.findUnique({ where: { user_id: user.id } });
+    if (newDbDriver) {
+      newDbDriver = await prisma.drivers.update({
+        where: { id: newDbDriver.id },
+        data: {
+          owner_id: owner?.id || newDbDriver.owner_id,
+          contact: body.phone || body.contact || newDbDriver.contact || '+91 98765 43210',
+          license_number: body.licenseNumber || body.license_number || newDbDriver.license_number,
+          license_expiry: licenseExpiryDate || newDbDriver.license_expiry,
+          status: 'active'
+        },
+        include: {
+          users: true,
+          driver_vehicle: { include: { vehicles: true } }
+        }
+      });
+    } else {
+      newDbDriver = await prisma.drivers.create({
+        data: {
+          user_id: user.id,
+          owner_id: owner?.id,
+          contact: body.phone || body.contact || '+91 98765 43210',
+          license_number: body.licenseNumber || body.license_number || `DL${Math.floor(10000000 + Math.random() * 90000000)}`,
+          license_expiry: licenseExpiryDate,
+          status: 'active'
+        },
+        include: {
+          users: true,
+          driver_vehicle: { include: { vehicles: true } }
+        }
+      });
+    }
+
+    if (body.assignedVehicleId && isUuid(body.assignedVehicleId)) {
+      await prisma.driver_vehicle.deleteMany({
+        where: { driver_id: newDbDriver.id }
+      });
+      await prisma.driver_vehicle.create({
+        data: {
+          driver_id: newDbDriver.id,
+          vehicle_id: body.assignedVehicleId
+        }
+      });
+      newDbDriver = await prisma.drivers.findUnique({
+        where: { id: newDbDriver.id },
+        include: {
+          users: true,
+          driver_vehicle: { include: { vehicles: true } }
+        }
+      });
+    }
 
     const formatted = formatDriver(newDbDriver);
     DRIVERS.unshift(formatted);
@@ -205,6 +295,25 @@ export const updateDriverStatus = async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
 
+  try {
+    if (isUuid(id)) {
+      const dbStatus = status.toLowerCase() === 'active' ? 'active' : status.toLowerCase() === 'suspended' ? 'suspended' : 'inactive';
+      const updated = await prisma.drivers.update({
+        where: { id },
+        data: { status: dbStatus },
+        include: {
+          users: true,
+          driver_vehicle: { include: { vehicles: true } }
+        }
+      });
+      const formatted = formatDriver(updated);
+      DRIVERS = DRIVERS.map((d) => (d.id === id ? formatted : d));
+      return res.json({ success: true, data: formatted });
+    }
+  } catch (err) {
+    console.warn('Prisma updateDriverStatus error, using memory fallback:', err.message);
+  }
+
   let updated = null;
   DRIVERS = DRIVERS.map((d) => {
     if (d.id === id) {
@@ -222,6 +331,21 @@ export const updateDriverStatus = async (req, res) => {
   }
 
   return res.json({ success: true, data: updated });
+};
+
+export const deleteDriver = async (req, res) => {
+  const { id } = req.params;
+  try {
+    if (isUuid(id)) {
+      await prisma.drivers.delete({ where: { id } });
+    }
+    DRIVERS = DRIVERS.filter((d) => d.id !== id);
+    return res.json({ success: true, message: 'Driver deleted successfully' });
+  } catch (err) {
+    console.warn('Prisma deleteDriver error, using memory fallback:', err.message);
+    DRIVERS = DRIVERS.filter((d) => d.id !== id);
+    return res.json({ success: true, message: 'Driver deleted' });
+  }
 };
 
 export const getSafetyMetrics = async (req, res) => {

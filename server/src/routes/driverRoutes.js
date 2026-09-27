@@ -4,6 +4,7 @@ import {
   getDriverById,
   createDriver,
   updateDriverStatus,
+  deleteDriver,
   getSafetyMetrics
 } from '../controllers/driverController.js';
 import { authMiddleware } from '../middleware/authMiddleware.js';
@@ -17,5 +18,6 @@ router.get('/', getDrivers);
 router.get('/:id', getDriverById);
 router.post('/', createDriver);
 router.patch('/:id/status', updateDriverStatus);
+router.delete('/:id', deleteDriver);
 
 export default router;
