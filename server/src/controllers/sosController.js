@@ -1,4 +1,5 @@
 import { broadcastAlert } from '../services/socketService.js';
+import prisma from '../repositories/store.js';
 
 let SOS_ALERTS = [];
 
@@ -16,6 +17,24 @@ export const triggerSOS = async (req, res) => {
     status: 'Open',
     location: { lat, lng }
   };
+
+  try {
+    const user = (await prisma.users.findFirst({ where: { role: 'SUPER_ADMIN' } })) || (await prisma.users.findFirst());
+    if (user) {
+      await prisma.notifications.create({
+        data: {
+          user_id: user.id,
+          title: `EMERGENCY SOS: ${vehicleReg || 'Fleet Vehicle'}`,
+          message: `Emergency SOS triggered by ${driverName || 'Driver'} at [${lat?.toFixed(4)}, ${lng?.toFixed(4)}]`,
+          type: 'SYSTEM',
+          status: 'sent',
+          sent_at: new Date()
+        }
+      });
+    }
+  } catch (dbErr) {
+    console.warn('Prisma triggerSOS notification error:', dbErr.message);
+  }
 
   SOS_ALERTS.unshift(newSOS);
   broadcastAlert(newSOS);

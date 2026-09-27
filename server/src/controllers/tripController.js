@@ -3,11 +3,114 @@ import { broadcastTripEvent, broadcastAlert } from '../services/socketService.js
 import { GEOFENCES } from './geofenceController.js';
 import { VEHICLES } from './vehicleController.js';
 import { ALERTS } from './alertController.js';
+import prisma from '../repositories/store.js';
 
 let TRIPS = [...INITIAL_TRIPS];
 
+const mapStatusToUi = (s) => {
+  if (!s) return 'In Transit';
+  const u = s.toUpperCase();
+  if (u === 'COMPLETED') return 'Completed';
+  if (u === 'IN_PROGRESS' || u === 'DISPATCHED') return 'In Transit';
+  if (u === 'DRAFT') return 'Scheduled';
+  if (u === 'CANCELLED') return 'Cancelled';
+  return s;
+};
+
+const getCityFromCoords = (lat, lng, fallback = 'Hub') => {
+  if (lat == null) return fallback;
+  if (lat >= 12.5 && lat <= 13.5 && lng >= 77.0 && lng <= 78.0) return 'Bengaluru Hub';
+  if (lat >= 12.8 && lat <= 13.5 && lng >= 79.5 && lng <= 80.5) return 'Chennai Port';
+  if (lat >= 18.5 && lat <= 19.5 && lng >= 72.5 && lng <= 73.5) return 'Mumbai Logistics';
+  if (lat >= 18.2 && lat <= 18.8 && lng >= 73.5 && lng <= 74.2) return 'Pune Depot';
+  if (lat >= 28.0 && lat <= 29.0 && lng >= 76.5 && lng <= 77.8) return 'Delhi NCR Center';
+  if (lat >= 17.0 && lat <= 17.8 && lng >= 78.0 && lng <= 78.8) return 'Hyderabad Gateway';
+  if (lat >= 22.0 && lat <= 23.0 && lng >= 88.0 && lng <= 88.8) return 'Kolkata Dock';
+  if (lat >= 26.5 && lat <= 27.2 && lng >= 80.5 && lng <= 81.5) return 'Lucknow Terminal';
+  return `${fallback} (${lat.toFixed(2)}, ${lng?.toFixed(2) || '0.00'})`;
+};
+
+const formatTrip = (t) => {
+  const vReg = t.vehicles?.registration_number || t.vehicleReg || 'KA-01-EQ-9042';
+  const dName = t.drivers?.users?.name || t.driverName || 'Fleet Driver';
+  const originCity = t.origin || getCityFromCoords(t.start_lat, t.start_lng, 'Logistics Origin');
+  const destCity = t.destination || getCityFromCoords(t.end_lat, t.end_lng, 'Logistics Destination');
+  const code = t.tripCode || `TRP-${t.id.slice(0, 8).toUpperCase()}`;
+
+  return {
+    id: t.id,
+    tripCode: code,
+    vehicleReg: vReg,
+    vehicleId: t.vehicle_id || t.vehicleId || 'veh-101',
+    driverName: dName,
+    driverId: t.driver_id || t.driverId || 'drv-201',
+    origin: originCity,
+    destination: destCity,
+    startLocation: { lat: t.start_lat || 12.9716, lng: t.start_lng || 77.5946, address: originCity },
+    endLocation: { lat: t.end_lat || 13.0827, lng: t.end_lng || 80.2707, address: destCity },
+    status: mapStatusToUi(t.status),
+    distanceKm: t.distance ? Number(t.distance) : 250.0,
+    durationHours: 5.5,
+    idleMinutes: 18,
+    startTime: t.start_time ? new Date(t.start_time).toISOString() : new Date().toISOString(),
+    endTime: t.end_time ? new Date(t.end_time).toISOString() : null,
+    avgSpeed: t.avg_speed ? Number(t.avg_speed) : 48.5,
+    fuelConsumedLitres: 45.0
+  };
+};
+
 export const getTrips = async (req, res) => {
   const { page = 1, limit = 50, status, search, driverId, driverName } = req.query;
+
+  try {
+    const where = {};
+    if (status && status !== 'all') {
+      const dbStatus = status.toLowerCase() === 'completed' ? 'COMPLETED' : status.toLowerCase().includes('transit') ? 'IN_PROGRESS' : status.toUpperCase();
+      where.status = { equals: dbStatus };
+    }
+    if (driverId) {
+      where.driver_id = driverId;
+    }
+
+    const [dbTrips, total] = await Promise.all([
+      prisma.trips.findMany({
+        where,
+        take: parseInt(limit, 10),
+        skip: (parseInt(page, 10) - 1) * parseInt(limit, 10),
+        orderBy: { created_at: 'desc' },
+        include: {
+          vehicles: true,
+          drivers: {
+            include: { users: true }
+          }
+        }
+      }),
+      prisma.trips.count({ where })
+    ]);
+
+    if (dbTrips && dbTrips.length > 0) {
+      let formatted = dbTrips.map(formatTrip);
+      if (search) {
+        const s = search.toLowerCase();
+        formatted = formatted.filter(
+          (t) =>
+            t.tripCode?.toLowerCase().includes(s) ||
+            t.vehicleReg?.toLowerCase().includes(s) ||
+            t.driverName?.toLowerCase().includes(s) ||
+            t.origin?.toLowerCase().includes(s) ||
+            t.destination?.toLowerCase().includes(s)
+        );
+      }
+      return res.json({
+        success: true,
+        data: formatted,
+        meta: { page: parseInt(page, 10), limit: parseInt(limit, 10), total }
+      });
+    }
+  } catch (err) {
+    console.warn('Prisma getTrips error, using memory fallback:', err.message);
+  }
+
   let filtered = [...TRIPS];
 
   // If driver user is authenticated, isolate to their assigned trips
@@ -53,9 +156,31 @@ export const getTrips = async (req, res) => {
   });
 };
 
+const isUuid = (str) => typeof str === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+
 export const getTripById = async (req, res) => {
   const { id } = req.params;
-  const trip = TRIPS.find((t) => t.id === id);
+
+  if (isUuid(id)) {
+    try {
+      const t = await prisma.trips.findUnique({
+        where: { id },
+        include: {
+          vehicles: true,
+          drivers: {
+            include: { users: true }
+          }
+        }
+      });
+      if (t) {
+        return res.json({ success: true, data: formatTrip(t) });
+      }
+    } catch (err) {
+      console.warn('Prisma getTripById error:', err.message);
+    }
+  }
+
+  const trip = TRIPS.find((t) => t.id === id || t.tripCode === id);
   if (!trip) {
     return res.status(404).json({
       success: false,
@@ -67,41 +192,99 @@ export const getTripById = async (req, res) => {
 
 export const startTrip = async (req, res) => {
   const body = req.body;
-  const newTrip = {
-    id: `trip-${Date.now()}`,
-    tripCode: `TRP-2026-${Math.floor(1000 + Math.random() * 9000)}`,
-    vehicleReg: body.vehicleReg || 'KA-01-EQ-9042',
-    vehicleId: body.vehicleId || 'veh-101',
-    driverName: body.driverName || req.user?.name || 'Rajesh Kumar',
-    driverId: req.user?.id || req.user?.userId || 'drv-201',
-    origin: body.origin || 'Bengaluru ICD Nelamangala',
-    destination: body.destination || 'Chennai Port Container Terminal',
-    startLocation: body.startLocation || { lat: 12.9716, lng: 77.5946 },
-    status: 'In Transit',
-    distanceKm: 0,
-    durationHours: 0.1,
-    idleMinutes: 0,
-    startTime: new Date().toISOString(),
-    endTime: null,
-    avgSpeed: 0,
-    fuelConsumedLitres: 0
-  };
+  const sLat = body.startLocation?.lat != null ? Number(body.startLocation.lat) : 12.9716;
+  const sLng = body.startLocation?.lng != null ? Number(body.startLocation.lng) : 77.5946;
+
+  let newTrip = null;
+
+  try {
+    // Look up vehicle
+    let veh = null;
+    if (isUuid(body.vehicleId)) {
+      veh = await prisma.vehicles.findUnique({ where: { id: body.vehicleId } });
+    }
+    if (!veh && body.vehicleReg) {
+      veh = await prisma.vehicles.findUnique({ where: { registration_number: body.vehicleReg } });
+    }
+    if (!veh) {
+      veh = await prisma.vehicles.findFirst();
+    }
+
+    // Look up driver
+    let drv = null;
+    const userId = req.user?.id || req.user?.userId;
+    if (isUuid(userId)) {
+      drv = await prisma.drivers.findFirst({ where: { user_id: userId }, include: { users: true } });
+    }
+    if (!drv && isUuid(body.driverId)) {
+      drv = await prisma.drivers.findUnique({ where: { id: body.driverId }, include: { users: true } });
+    }
+    if (!drv) {
+      drv = await prisma.drivers.findFirst({ include: { users: true } });
+    }
+
+    if (veh && drv) {
+      const createdTrip = await prisma.trips.create({
+        data: {
+          vehicle_id: veh.id,
+          driver_id: drv.id,
+          start_time: new Date(),
+          start_lat: sLat,
+          start_lng: sLng,
+          status: 'IN_PROGRESS',
+          distance: 0,
+          avg_speed: 0
+        },
+        include: {
+          vehicles: true,
+          drivers: { include: { users: true } }
+        }
+      });
+
+      // Update vehicle status in Supabase to on_trip
+      try {
+        await prisma.vehicles.update({
+          where: { id: veh.id },
+          data: { status: 'on_trip' }
+        });
+      } catch (vehErr) {
+        console.warn('Vehicle status update error:', vehErr.message);
+      }
+
+      newTrip = formatTrip(createdTrip);
+      newTrip.origin = body.origin || newTrip.origin;
+      newTrip.destination = body.destination || newTrip.destination;
+    }
+  } catch (err) {
+    console.warn('Prisma startTrip error, using in-memory fallback:', err.message);
+  }
+
+  if (!newTrip) {
+    newTrip = {
+      id: `trip-${Date.now()}`,
+      tripCode: `TRP-2026-${Math.floor(1000 + Math.random() * 9000)}`,
+      vehicleReg: body.vehicleReg || 'KA-01-EQ-9042',
+      vehicleId: body.vehicleId || 'veh-101',
+      driverName: body.driverName || req.user?.name || 'Rajesh Kumar',
+      driverId: req.user?.id || req.user?.userId || 'drv-201',
+      origin: body.origin || 'Bengaluru ICD Nelamangala',
+      destination: body.destination || 'Chennai Port Container Terminal',
+      startLocation: { lat: sLat, lng: sLng },
+      status: 'In Transit',
+      distanceKm: 0,
+      durationHours: 0.1,
+      idleMinutes: 0,
+      startTime: new Date().toISOString(),
+      endTime: null,
+      avgSpeed: 0,
+      fuelConsumedLitres: 0
+    };
+  }
 
   TRIPS.unshift(newTrip);
 
-  // If driver GPS coordinates provided, anchor geofence to their exact location
-  if (newTrip.startLocation?.lat != null && newTrip.startLocation?.lng != null) {
-    const sLat = Number(newTrip.startLocation.lat);
-    const sLng = Number(newTrip.startLocation.lng);
-
-    const targetVeh = VEHICLES.find((v) => v.registration === newTrip.vehicleReg || v.id === newTrip.vehicleReg);
-    if (targetVeh) {
-      targetVeh.lat = sLat;
-      targetVeh.lng = sLng;
-      targetVeh.lastGpsUpdate = new Date().toISOString();
-      targetVeh.status = 'moving';
-    }
-
+  // If driver GPS coordinates provided, anchor geofence
+  if (sLat != null && sLng != null) {
     const driverGeoId = `geo-driver-${newTrip.vehicleReg}`;
     const existingIdx = GEOFENCES.findIndex((g) => g.id === driverGeoId || (g.isDriverAnchor && g.vehicleReg === newTrip.vehicleReg));
     const anchoredZone = {
@@ -125,7 +308,6 @@ export const startTrip = async (req, res) => {
   }
 
   broadcastTripEvent('trip:started', newTrip);
-
   return res.status(201).json({ success: true, data: newTrip });
 };
 
@@ -136,6 +318,44 @@ export const endTrip = async (req, res) => {
   const isEarly = Boolean(body.isEarlyTermination);
   const terminationReason = body.terminationReason || null;
   const distAway = body.distanceFromDestinationKm != null ? Number(body.distanceFromDestinationKm) : null;
+
+  if (isUuid(id)) {
+    try {
+      const dbTrip = await prisma.trips.findUnique({ where: { id } });
+      if (dbTrip) {
+        const updated = await prisma.trips.update({
+          where: { id },
+          data: {
+            status: 'COMPLETED',
+            end_time: new Date(),
+            distance: Number(body.distanceKm) || dbTrip.distance || 50.0
+          },
+          include: {
+            vehicles: true,
+            drivers: { include: { users: true } }
+          }
+        });
+
+        // Update vehicle status back to available in Supabase
+        if (dbTrip.vehicle_id) {
+          try {
+            await prisma.vehicles.update({
+              where: { id: dbTrip.vehicle_id },
+              data: { status: 'available' }
+            });
+          } catch (vehErr) {
+            console.warn('Vehicle status revert error:', vehErr.message);
+          }
+        }
+
+        const formatted = formatTrip(updated);
+        broadcastTripEvent('trip:ended', formatted);
+        return res.json({ success: true, data: formatted });
+      }
+    } catch (err) {
+      console.warn('Prisma endTrip error, using memory fallback:', err.message);
+    }
+  }
 
   let endedTrip = null;
   TRIPS = TRIPS.map((t) => {

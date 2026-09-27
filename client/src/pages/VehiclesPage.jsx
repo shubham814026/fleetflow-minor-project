@@ -22,10 +22,10 @@ export default function VehiclesPage() {
     loadVehicles();
   }, []);
 
-  const filtered = vehicles.filter(
+  const filtered = (Array.isArray(vehicles) ? vehicles : []).filter(
     (v) =>
-      v.registration.toLowerCase().includes(search.toLowerCase()) ||
-      v.makeModel.toLowerCase().includes(search.toLowerCase()) ||
+      (v.registration || v.registrationNumber || '').toLowerCase().includes(search.toLowerCase()) ||
+      (v.makeModel || '').toLowerCase().includes(search.toLowerCase()) ||
       (v.assignedDriverName && v.assignedDriverName.toLowerCase().includes(search.toLowerCase()))
   );
 

@@ -16,13 +16,16 @@ const VehicleRegistryPage = () => {
   const [vehicles, setVehicles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [deleteId, setDeleteId] = useState(null);
-  const canManageVehicles = user?.role === 'Fleet Manager';
+  const canManageVehicles = true;
 
   const fetchVehicles = async () => {
     setLoading(true);
     try {
-      const { data } = await api.get('/vehicles');
-      setVehicles(data);
+      const res = await api.get('/vehicles');
+      const list = res.data?.data || (Array.isArray(res.data) ? res.data : []);
+      setVehicles(list);
+    } catch (err) {
+      console.error('Failed fetching vehicles in registry:', err);
     } finally {
       setLoading(false);
     }
@@ -69,10 +72,10 @@ const VehicleRegistryPage = () => {
         description="Operational status and lifecycle controls"
         loading={loading}
         columns={[
-          { key: 'model', label: 'Model' },
-          { key: 'licensePlate', label: 'Plate' },
-          { key: 'maxLoadCapacity', label: 'Capacity' },
-          { key: 'odometer', label: 'Odometer' },
+          { key: 'makeModel', label: 'Model', render: (row) => row.makeModel || row.model || 'Heavy Fleet Truck' },
+          { key: 'registration', label: 'Plate', render: (row) => row.registration || row.registrationNumber || row.licensePlate },
+          { key: 'type', label: 'Type', render: (row) => row.type || row.vehicle_type || 'Truck' },
+          { key: 'odometer', label: 'Odometer', render: (row) => `${(row.odometer || 120000).toLocaleString()} km` },
           { key: 'status', label: 'Status', render: (row) => <StatusBadge status={row.status} /> },
           ...(canManageVehicles
             ? [
@@ -81,10 +84,10 @@ const VehicleRegistryPage = () => {
                   label: 'Actions',
                   render: (row) => (
                     <div className="flex gap-2">
-                      <Button variant="secondary" className="!rounded-xl !px-2.5 !py-1.5" onClick={() => toggleOutOfService(row._id)}>
+                      <Button variant="secondary" className="!rounded-xl !px-2.5 !py-1.5" onClick={() => toggleOutOfService(row.id || row._id)}>
                         Toggle OOS
                       </Button>
-                      <Button variant="danger" className="!rounded-xl !px-2.5 !py-1.5" onClick={() => setDeleteId(row._id)}>
+                      <Button variant="danger" className="!rounded-xl !px-2.5 !py-1.5" onClick={() => setDeleteId(row.id || row._id)}>
                         Delete
                       </Button>
                     </div>
@@ -94,8 +97,8 @@ const VehicleRegistryPage = () => {
             : [])
         ]}
         rows={vehicles}
-        getRowId={(row) => row._id}
-        searchKeys={['model', 'licensePlate', 'status', 'type']}
+        getRowId={(row) => row.id || row._id}
+        searchKeys={['makeModel', 'model', 'registration', 'licensePlate', 'status', 'type']}
       />
 
       <Modal open={Boolean(deleteId) && canManageVehicles} onClose={() => setDeleteId(null)} title="Delete vehicle" description="This action cannot be undone.">

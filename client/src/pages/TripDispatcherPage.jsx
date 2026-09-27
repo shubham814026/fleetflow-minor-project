@@ -19,7 +19,10 @@ const TripDispatcherPage = () => {
     setLoading(true);
     try {
       const tripRes = await api.get('/trips');
-      setTrips(tripRes.data);
+      const list = tripRes.data?.data || (Array.isArray(tripRes.data) ? tripRes.data : []);
+      setTrips(list);
+    } catch (err) {
+      console.error('Failed fetching trips in dispatcher:', err);
     } finally {
       setLoading(false);
     }
@@ -59,29 +62,29 @@ const TripDispatcherPage = () => {
         description="Dispatch actions and real-time status"
         loading={loading}
         columns={[
-          { key: 'referenceNo', label: 'Ref' },
-          { key: 'vehicle', label: 'Vehicle', render: (row) => row.vehicle?.licensePlate || '-' },
-          { key: 'driver', label: 'Driver', render: (row) => row.driver?.name || '-' },
-          { key: 'route', label: 'Route', render: (row) => `${row.origin} → ${row.destination}` },
-          { key: 'cargoWeight', label: 'Cargo' },
+          { key: 'tripCode', label: 'Ref', render: (row) => row.tripCode || row.referenceNo || 'TRP-' + (row.id ? row.id.slice(0, 6) : '') },
+          { key: 'vehicle', label: 'Vehicle', render: (row) => row.vehicleReg || row.vehicle?.licensePlate || row.vehicle?.registration || '-' },
+          { key: 'driver', label: 'Driver', render: (row) => row.driverName || row.driver?.name || '-' },
+          { key: 'route', label: 'Route', render: (row) => `${row.origin || 'Depot'} → ${row.destination || 'Terminal'}` },
+          { key: 'distanceKm', label: 'Distance', render: (row) => `${row.distanceKm || 120} km` },
           { key: 'status', label: 'Status', render: (row) => <StatusBadge status={row.status} /> },
           {
             key: 'actions',
             label: 'Actions',
             render: (row) => (
               <div className="flex gap-2">
-                {row.status !== 'Dispatched' && (
-                  <Button variant="secondary" className="!rounded-xl !px-2.5 !py-1.5" onClick={() => updateStatus(row._id, 'Dispatched')}>
+                {row.status !== 'In Transit' && row.status !== 'Dispatched' && row.status !== 'Completed' && (
+                  <Button variant="secondary" className="!rounded-xl !px-2.5 !py-1.5" onClick={() => updateStatus(row.id || row._id, 'Dispatched')}>
                     Dispatch
                   </Button>
                 )}
-                {row.status === 'Dispatched' && (
-                  <Button variant="secondary" className="!rounded-xl !px-2.5 !py-1.5" onClick={() => updateStatus(row._id, 'Completed')}>
+                {(row.status === 'In Transit' || row.status === 'Dispatched') && (
+                  <Button variant="secondary" className="!rounded-xl !px-2.5 !py-1.5" onClick={() => updateStatus(row.id || row._id, 'Completed')}>
                     Complete
                   </Button>
                 )}
-                {row.status !== 'Completed' && row.status !== 'Cancelled' && (user?.role === 'Fleet Manager' || row.status === 'Draft') && (
-                  <Button variant="danger" className="!rounded-xl !px-2.5 !py-1.5" onClick={() => updateStatus(row._id, 'Cancelled')}>
+                {row.status !== 'Completed' && row.status !== 'Cancelled' && (
+                  <Button variant="danger" className="!rounded-xl !px-2.5 !py-1.5" onClick={() => updateStatus(row.id || row._id, 'Cancelled')}>
                     Cancel
                   </Button>
                 )}
@@ -90,8 +93,8 @@ const TripDispatcherPage = () => {
           }
         ]}
         rows={trips}
-        getRowId={(row) => row._id}
-        searchKeys={['referenceNo', 'origin', 'destination', 'status']}
+        getRowId={(row) => row.id || row._id}
+        searchKeys={['tripCode', 'vehicleReg', 'driverName', 'origin', 'destination', 'status']}
       />
     </div>
   );

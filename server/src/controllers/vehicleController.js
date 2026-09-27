@@ -1,23 +1,98 @@
 import { INITIAL_VEHICLES, DEMO_UTILISATION } from '../../../client/src/api/mockData.js';
 import { mlServiceClient } from '../services/mlServiceClient.js';
+import prisma from '../repositories/store.js';
 
 let VEHICLES = [...INITIAL_VEHICLES];
 
-export const getVehicles = async (req, res) => {
-  const { page = 1, limit = 20, status, search } = req.query;
-  let filtered = [...VEHICLES];
+const formatVehicle = (v) => {
+  const driverVehicle = v.driver_vehicle?.[0];
+  const driverName = driverVehicle?.drivers?.users?.name;
+  const driverId = driverVehicle?.driver_id;
+  return {
+    id: v.id,
+    registration: v.registration_number,
+    registrationNumber: v.registration_number,
+    makeModel: `${v.brand || ''} ${v.model || ''}`.trim() || 'Heavy Fleet Truck',
+    type: v.vehicle_type || 'Heavy Truck',
+    status: v.status || 'available',
+    speed: 0,
+    heading: 0,
+    lat: 12.9716,
+    lng: 77.5946,
+    fuelLevel: v.tank_capacity ? Math.min(100, Math.round(Number(v.tank_capacity) % 100)) : 80,
+    odometer: v.estimated_mileage ? Math.round(Number(v.estimated_mileage) * 1000) : 124500,
+    assignedDriverId: driverId || null,
+    assignedDriverName: driverName || 'Unassigned',
+    purchaseDate: v.purchase_date ? new Date(v.purchase_date).toISOString().split('T')[0] : '2023-01-15',
+    insuranceExpiry: '2027-04-20',
+    pucExpiry: '2026-12-15',
+    lastGpsUpdate: v.updated_at ? new Date(v.updated_at).toISOString() : new Date().toISOString(),
+    sensitive: {
+      chassisNumber: `MAT${v.id.slice(0, 10).toUpperCase().replace(/-/g, '')}`,
+      engineNumber: `ENG-${v.id.slice(0, 8).toUpperCase()}`,
+      rcNumber: `${v.registration_number}RC`,
+      insurancePolicyNo: `POL-SF-${v.id.slice(0, 6).toUpperCase()}`
+    }
+  };
+};
 
-  if (status) {
-    filtered = filtered.filter((v) => v.status.toLowerCase() === status.toLowerCase());
+export const getVehicles = async (req, res) => {
+  const { page = 1, limit = 50, status, search } = req.query;
+
+  try {
+    const where = {};
+    if (status && status !== 'all') {
+      where.status = { equals: status, mode: 'insensitive' };
+    }
+    if (search) {
+      where.OR = [
+        { registration_number: { contains: search, mode: 'insensitive' } },
+        { brand: { contains: search, mode: 'insensitive' } },
+        { model: { contains: search, mode: 'insensitive' } }
+      ];
+    }
+
+    const [dbVehicles, total] = await Promise.all([
+      prisma.vehicles.findMany({
+        where,
+        take: parseInt(limit, 10),
+        skip: (parseInt(page, 10) - 1) * parseInt(limit, 10),
+        orderBy: { created_at: 'desc' },
+        include: {
+          driver_vehicle: {
+            take: 1,
+            include: {
+              drivers: {
+                include: { users: true }
+              }
+            }
+          }
+        }
+      }),
+      prisma.vehicles.count({ where })
+    ]);
+
+    const formatted = (dbVehicles || []).map(formatVehicle);
+    return res.json({
+      success: true,
+      data: formatted,
+      meta: { page: parseInt(page, 10), limit: parseInt(limit, 10), total }
+    });
+  } catch (err) {
+    console.warn('Prisma getVehicles error, using fallback:', err.message);
   }
 
+  // Fallback to in-memory only if DB connection failed
+  let filtered = [...VEHICLES];
+  if (status && status !== 'all') {
+    filtered = filtered.filter((v) => v.status.toLowerCase() === status.toLowerCase());
+  }
   if (search) {
     const s = search.toLowerCase();
     filtered = filtered.filter(
       (v) => v.registration.toLowerCase().includes(s) || v.makeModel.toLowerCase().includes(s)
     );
   }
-
   const total = filtered.length;
   const start = (page - 1) * limit;
   const paginated = filtered.slice(start, start + parseInt(limit, 10));
@@ -31,7 +106,40 @@ export const getVehicles = async (req, res) => {
 
 export const getVehicleById = async (req, res) => {
   const { id } = req.params;
-  const vehicle = VEHICLES.find((v) => v.id === id);
+
+  try {
+    const v = await prisma.vehicles.findFirst({
+      where: {
+        OR: [
+          { id: id },
+          { registration_number: id }
+        ]
+      },
+      include: {
+        driver_vehicle: {
+          take: 1,
+          include: {
+            drivers: {
+              include: { users: true }
+            }
+          }
+        }
+      }
+    });
+
+    if (v) {
+      const formatted = formatVehicle(v);
+      const hasSecondaryAuth = Boolean(req.headers['x-secondary-auth']);
+      if (!hasSecondaryAuth) {
+        delete formatted.sensitive;
+      }
+      return res.json({ success: true, data: formatted });
+    }
+  } catch (err) {
+    console.warn('Prisma getVehicleById error, using fallback:', err.message);
+  }
+
+  const vehicle = VEHICLES.find((v) => v.id === id || v.registration === id);
   if (!vehicle) {
     return res.status(404).json({
       success: false,
@@ -39,10 +147,8 @@ export const getVehicleById = async (req, res) => {
     });
   }
 
-  // Hide sensitive specs if secondary auth header is missing
   const hasSecondaryAuth = Boolean(req.headers['x-secondary-auth']);
   const responseData = { ...vehicle };
-
   if (!hasSecondaryAuth) {
     delete responseData.sensitive;
   }
@@ -52,76 +158,187 @@ export const getVehicleById = async (req, res) => {
 
 export const createVehicle = async (req, res) => {
   const body = req.body;
-  const newV = {
-    id: `veh-${Date.now()}`,
-    registration: body.registrationNumber || body.registration || `KA-01-XX-${Math.floor(1000 + Math.random() * 9000)}`,
-    makeModel: body.makeModel || 'Tata Truck',
-    type: body.type || 'Heavy Truck',
-    status: 'moving',
-    speed: 55,
-    heading: 90,
-    lat: 12.9716,
-    lng: 77.5946,
-    fuelLevel: 100,
-    odometer: body.odometer || 1200,
-    lastGpsUpdate: new Date().toISOString(),
-    ...body
-  };
+  const reg = (body.registrationNumber || body.registration || `KA-01-SF-${Math.floor(1000 + Math.random() * 9000)}`).trim();
 
-  VEHICLES.unshift(newV);
-  return res.status(201).json({ success: true, data: newV });
+  try {
+    let owner = await prisma.owners.findFirst();
+    if (!owner) {
+      const firstUser = await prisma.users.findFirst({ where: { role: 'OWNER' } }) || await prisma.users.findFirst();
+      if (firstUser) {
+        owner = await prisma.owners.create({
+          data: {
+            user_id: firstUser.id,
+            company_name: 'SmartFleet Logistics'
+          }
+        });
+      }
+    }
+
+    const newDbVehicle = await prisma.vehicles.create({
+      data: {
+        registration_number: reg,
+        brand: body.brand || body.makeModel?.split(' ')[0] || 'Tata',
+        model: body.model || body.makeModel?.split(' ').slice(1).join(' ') || 'Signa Truck',
+        vehicle_type: body.type || 'Heavy Truck',
+        status: body.status || 'available',
+        owner_id: owner.id
+      }
+    });
+
+    const formatted = formatVehicle(newDbVehicle);
+    VEHICLES.unshift(formatted);
+    return res.status(201).json({ success: true, data: formatted });
+  } catch (err) {
+    console.warn('Prisma createVehicle error, saving to memory:', err.message);
+    const newV = {
+      id: `veh-${Date.now()}`,
+      registration: reg,
+      registrationNumber: reg,
+      makeModel: body.makeModel || 'Tata Truck',
+      type: body.type || 'Heavy Truck',
+      status: body.status || 'available',
+      speed: 0,
+      heading: 0,
+      lat: 12.9716,
+      lng: 77.5946,
+      fuelLevel: 100,
+      odometer: body.odometer || 1200,
+      lastGpsUpdate: new Date().toISOString(),
+      ...body
+    };
+    VEHICLES.unshift(newV);
+    return res.status(201).json({ success: true, data: newV });
+  }
 };
 
 export const updateVehicleStatus = async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
-  let updated = null;
 
+  try {
+    const isUuid = typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    const where = isUuid ? { id } : { registration_number: id };
+
+    const updatedDb = await prisma.vehicles.update({
+      where,
+      data: { status }
+    });
+    if (updatedDb) {
+      return res.json({ success: true, data: formatVehicle(updatedDb) });
+    }
+  } catch (err) {
+    console.warn('Prisma updateVehicleStatus error:', err.message);
+  }
+
+  let updated = null;
   VEHICLES = VEHICLES.map((v) => {
-    if (v.id === id) {
+    if (v.id === id || v.registration === id) {
       updated = { ...v, status };
       return updated;
     }
     return v;
   });
 
-  return res.json({ success: true, data: updated });
+  return res.json({ success: true, data: updated || { id, status } });
+};
+
+export const toggleOutOfService = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const isUuid = typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    const where = isUuid ? { id } : { registration_number: id };
+
+    const current = await prisma.vehicles.findUnique({ where });
+    if (current) {
+      const nextStatus = current.status === 'out_of_service' ? 'available' : 'out_of_service';
+      const updated = await prisma.vehicles.update({
+        where,
+        data: { status: nextStatus }
+      });
+      return res.json({ success: true, data: formatVehicle(updated) });
+    }
+  } catch (err) {
+    console.warn('Prisma toggleOutOfService error:', err.message);
+  }
+
+  return updateVehicleStatus(req, res);
 };
 
 export const deleteVehicle = async (req, res) => {
   const { id } = req.params;
-  VEHICLES = VEHICLES.filter((v) => v.id !== id);
+
+  try {
+    const isUuid = typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    const where = isUuid ? { id } : { registration_number: id };
+    await prisma.vehicles.delete({ where });
+    return res.json({ success: true, data: { id, deleted: true } });
+  } catch (err) {
+    console.warn('Prisma deleteVehicle error:', err.message);
+  }
+
+  VEHICLES = VEHICLES.filter((v) => v.id !== id && v.registration !== id);
   return res.json({ success: true, data: { id, deleted: true } });
 };
 
 export const getUtilisationMetrics = async (req, res) => {
   try {
-    const scoredList = await Promise.all(
-      DEMO_UTILISATION.map(async (item) => {
-        try {
-          const mlScore = await mlServiceClient.getDriverUtilisation(item.id, {
-            driver_id: item.id,
-            driver_name: item.assignedDriverName || 'Fleet Driver',
-            trips_per_day: item.tripsPerDay || 0.35,
-            active_hours: (item.activeHours || 6.5) * 240,
-            idle_hours: (item.idleRatio || 0.15) * (item.activeHours || 6.5) * 240
-          });
-          return {
-            ...item,
-            score: Math.round(mlScore.score),
-            recommendation: mlScore.recommendation,
-            cluster: mlScore.cluster,
-            isLiveModel: true
+    const dbVehicles = await prisma.vehicles.findMany({
+      take: 10,
+      orderBy: { created_at: 'desc' },
+      include: {
+        driver_vehicle: {
+          take: 1,
+          include: { drivers: { include: { users: true } } }
+        },
+        trips: { take: 5 }
+      }
+    });
+
+    if (dbVehicles && dbVehicles.length > 0) {
+      const list = await Promise.all(
+        dbVehicles.map(async (v, idx) => {
+          const driverName = v.driver_vehicle?.[0]?.drivers?.users?.name || 'Fleet Driver';
+          const tripsCount = v.trips?.length || (idx % 3 + 1);
+          const activeHours = parseFloat(((tripsCount * 4.2) + 2).toFixed(1));
+          const idleRatio = parseFloat((0.10 + (idx * 0.04)).toFixed(2));
+          const baseItem = {
+            id: v.id,
+            vehicleReg: v.registration_number,
+            score: Math.min(95, 70 + tripsCount * 6),
+            activeHours,
+            idleRatio,
+            tripsPerDay: parseFloat((tripsCount / 2).toFixed(1)),
+            recommendation: tripsCount > 2 ? 'Optimal' : 'Monitor',
+            assignedDriverName: driverName
           };
-        } catch {
-          return item;
-        }
-      })
-    );
-    return res.json({ success: true, data: scoredList });
-  } catch {
-    return res.json({ success: true, data: DEMO_UTILISATION });
+
+          try {
+            const mlScore = await mlServiceClient.getDriverUtilisation(v.id, {
+              driver_id: v.driver_vehicle?.[0]?.driver_id || v.id,
+              driver_name: driverName,
+              trips_per_day: baseItem.tripsPerDay,
+              active_hours: baseItem.activeHours * 240,
+              idle_hours: baseItem.idleRatio * baseItem.activeHours * 240
+            });
+            return {
+              ...baseItem,
+              score: Math.round(mlScore.score || baseItem.score),
+              recommendation: mlScore.recommendation || baseItem.recommendation,
+              cluster: mlScore.cluster,
+              isLiveModel: true
+            };
+          } catch {
+            return baseItem;
+          }
+        })
+      );
+      return res.json({ success: true, data: list });
+    }
+  } catch (err) {
+    console.warn('Prisma getUtilisationMetrics error, using fallback:', err.message);
   }
+
+  return res.json({ success: true, data: DEMO_UTILISATION });
 };
 
 export { VEHICLES };

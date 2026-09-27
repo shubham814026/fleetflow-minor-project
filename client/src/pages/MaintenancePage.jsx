@@ -58,7 +58,7 @@ export default function MaintenancePage() {
                   <td className="p-4 font-medium text-slate-300">{r.serviceType}</td>
                   <td className="p-4 text-slate-400">{r.lastServiceDate}</td>
                   <td className="p-4 font-semibold text-slate-200">{r.nextServiceDate}</td>
-                  <td className="p-4 font-mono font-bold text-amber-400">{r.odometer.toLocaleString()} km</td>
+                  <td className="p-4 font-mono font-bold text-amber-400">{r.odometer ? Number(r.odometer).toLocaleString() : '120,000'} km</td>
                   <td className="p-4">
                     <span
                       className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase ${

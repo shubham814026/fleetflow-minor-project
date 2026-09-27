@@ -22,10 +22,10 @@ export default function DriversPage() {
     loadDrivers();
   }, []);
 
-  const filtered = drivers.filter(
+  const filtered = (Array.isArray(drivers) ? drivers : []).filter(
     (d) =>
-      d.name.toLowerCase().includes(search.toLowerCase()) ||
-      d.email.toLowerCase().includes(search.toLowerCase()) ||
+      (d.name || '').toLowerCase().includes(search.toLowerCase()) ||
+      (d.email || '').toLowerCase().includes(search.toLowerCase()) ||
       (d.assignedVehicleReg && d.assignedVehicleReg.toLowerCase().includes(search.toLowerCase()))
   );
 

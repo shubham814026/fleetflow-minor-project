@@ -22,13 +22,13 @@ export default function TripsPage() {
     loadTrips();
   }, []);
 
-  const filtered = trips.filter(
+  const filtered = (Array.isArray(trips) ? trips : []).filter(
     (t) =>
-      t.tripCode.toLowerCase().includes(search.toLowerCase()) ||
-      t.vehicleReg.toLowerCase().includes(search.toLowerCase()) ||
-      t.driverName.toLowerCase().includes(search.toLowerCase()) ||
-      t.origin.toLowerCase().includes(search.toLowerCase()) ||
-      t.destination.toLowerCase().includes(search.toLowerCase())
+      (t.tripCode || '').toLowerCase().includes(search.toLowerCase()) ||
+      (t.vehicleReg || '').toLowerCase().includes(search.toLowerCase()) ||
+      (t.driverName || '').toLowerCase().includes(search.toLowerCase()) ||
+      (t.origin || '').toLowerCase().includes(search.toLowerCase()) ||
+      (t.destination || '').toLowerCase().includes(search.toLowerCase())
   );
 
   return (

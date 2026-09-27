@@ -31,8 +31,8 @@ export default function AlertsPage() {
     }
   };
 
-  const filtered = alerts.filter(
-    (a) => categoryFilter === 'ALL' || a.category.toLowerCase() === categoryFilter.toLowerCase()
+  const filtered = (Array.isArray(alerts) ? alerts : []).filter(
+    (a) => categoryFilter === 'ALL' || (a.category || '').toLowerCase() === categoryFilter.toLowerCase()
   );
 
   return (

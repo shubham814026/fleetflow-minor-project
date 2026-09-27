@@ -2,6 +2,7 @@ import { DEMO_GEOFENCES } from '../../../client/src/api/mockData.js';
 import { broadcastGeofenceViolation, broadcastAlert } from '../services/socketService.js';
 import { ALERTS } from './alertController.js';
 import { VEHICLES } from './vehicleController.js';
+import prisma from '../repositories/store.js';
 
 export let GEOFENCES = [...DEMO_GEOFENCES];
 
@@ -133,6 +134,47 @@ export const checkGeofenceViolations = (lat, lng, vehicle) => {
 };
 
 export const getGeofences = async (req, res) => {
+  try {
+    const dbZones = await prisma.geofences.findMany();
+    if (dbZones && dbZones.length > 0) {
+      const cityCoords = {
+        Mumbai: [19.0760, 72.8777],
+        Delhi: [28.6139, 77.2090],
+        Bengaluru: [12.9716, 77.5946],
+        Hyderabad: [17.3850, 78.4867],
+        Chennai: [13.0827, 80.2707],
+        Kolkata: [22.5726, 88.3639],
+        Pune: [18.5204, 73.8567],
+        Ahmedabad: [23.0225, 72.5714]
+      };
+
+      const mapped = dbZones.map((z) => {
+        let center = [12.9716, 77.5946];
+        for (const [cityName, coords] of Object.entries(cityCoords)) {
+          if (z.name?.toLowerCase().includes(cityName.toLowerCase())) {
+            center = coords;
+            break;
+          }
+        }
+        const isRestricted = z.name?.toLowerCase().includes('red') || z.name?.toLowerCase().includes('restrict');
+        return {
+          id: z.id,
+          name: z.name,
+          type: isRestricted ? 'Restricted' : 'Permitted',
+          center: center,
+          radius: z.radius ? Number(z.radius) : 5000,
+          color: isRestricted ? '#EF4444' : '#10B981',
+          isActive: z.is_active
+        };
+      });
+
+      const anchors = GEOFENCES.filter((g) => g.isDriverAnchor);
+      return res.json({ success: true, data: [...anchors, ...mapped] });
+    }
+  } catch (err) {
+    console.warn('Prisma getGeofences error:', err.message);
+  }
+
   return res.json({ success: true, data: GEOFENCES });
 };
 
@@ -204,11 +246,45 @@ export const anchorDriverGeofence = async (req, res) => {
 export const createGeofence = async (req, res) => {
   const body = req.body;
 
-  // If center is not provided or set to null, find latest driver/vehicle location instead of random coordinates
   let center = body.center;
   if (!center || !Array.isArray(center) || center.length < 2) {
     const activeVeh = VEHICLES.find((v) => v.lat != null && v.lng != null);
     center = activeVeh ? [activeVeh.lat, activeVeh.lng] : [12.9716, 77.5946];
+  }
+
+  const radius = body.radius ? Number(body.radius) : 10000;
+  const isRestricted = (body.type || '').toUpperCase() === 'RESTRICTED';
+
+  try {
+    const owner = await prisma.owners.findFirst();
+    if (owner) {
+      const dbZone = await prisma.geofences.create({
+        data: {
+          owner_id: owner.id,
+          name: body.name || 'New Logistics Corridor',
+          radius: radius,
+          is_active: true,
+          polygon: { center, type: body.type || 'Permitted' }
+        }
+      });
+
+      const newG = {
+        id: dbZone.id,
+        name: dbZone.name,
+        type: isRestricted ? 'Restricted' : 'Permitted',
+        center,
+        radius,
+        color: isRestricted ? '#EF4444' : '#10B981',
+        isActive: true,
+        isDriverAnchor: Boolean(body.isDriverAnchor),
+        vehicleReg: body.vehicleReg || null
+      };
+
+      GEOFENCES.unshift(newG);
+      return res.status(201).json({ success: true, data: newG });
+    }
+  } catch (err) {
+    console.warn('Prisma createGeofence error, using fallback:', err.message);
   }
 
   const newG = {
@@ -216,8 +292,8 @@ export const createGeofence = async (req, res) => {
     name: body.name || 'New Logistics Corridor',
     type: body.type || 'Permitted',
     center,
-    radius: body.radius ? Number(body.radius) : 10000,
-    color: (body.type || '').toUpperCase() === 'RESTRICTED' ? '#EF4444' : '#10B981',
+    radius,
+    color: isRestricted ? '#EF4444' : '#10B981',
     isDriverAnchor: Boolean(body.isDriverAnchor),
     vehicleReg: body.vehicleReg || null
   };
@@ -228,6 +304,16 @@ export const createGeofence = async (req, res) => {
 
 export const deleteGeofence = async (req, res) => {
   const { id } = req.params;
+  const isUuid = typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
+  if (isUuid) {
+    try {
+      await prisma.geofences.delete({ where: { id } });
+    } catch (err) {
+      console.warn('Prisma deleteGeofence error:', err.message);
+    }
+  }
+
   GEOFENCES = GEOFENCES.filter((g) => g.id !== id);
   return res.json({ success: true, data: { id, deleted: true } });
 };

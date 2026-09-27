@@ -337,6 +337,16 @@ export const fuelApi = {
     }
   },
 
+  getLogs: async () => {
+    try {
+      const res = await apiClient.get('/fuel/logs');
+      return res.data?.data || res.data;
+    } catch (e) {
+      await delay();
+      return [];
+    }
+  },
+
   addFuelLog: async (log) => {
     try {
       const res = await apiClient.post('/fuel/logs', log);
