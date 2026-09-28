@@ -3,4 +3,19 @@ node_modules
 .DS_Store
 dist
 coverage
-.vscode/*.log
+*.db
+*.log
+.vscode/
+
+# Python & ML Local Artifacts
+__pycache__/
+*.pyc
+ml_datasets/
+ml_seed/
+models/
+models code/
+reports/
+.agents/
+skills-lock.json
+scratch/
+data/

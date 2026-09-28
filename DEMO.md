@@ -33,7 +33,7 @@ Paper logbooks fail in real time. FleetFlow shows live status (Available/On Trip
 
 ## 5) Tech Snapshot (15s)
 - Frontend: React (Vite), Tailwind, React Router, Context, Axios, Chart.js.
-- Backend: Node/Express, MongoDB/Mongoose, JWT, role guards.
+- Backend: Node/Express, Supabase PostgreSQL, Prisma ORM, JWT, role guards.
 - Seed data + scripts: `npm run seed` (server), `npm run dev` (server/client).
 
 ## 6) Call to Action (10s)

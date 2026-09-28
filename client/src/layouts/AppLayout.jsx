@@ -1,72 +1,96 @@
+import React, { useState } from 'react';
+import { Outlet, useLocation, Navigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { useState } from 'react';
-import { Outlet, useLocation } from 'react-router-dom';
 import {
-  Activity,
-  BarChart3,
-  Fuel,
   LayoutDashboard,
-  ShieldCheck,
+  MapPin,
   Truck,
-  Waypoints
+  Users,
+  Waypoints,
+  Fuel,
+  Activity,
+  AlertTriangle,
+  TrendingUp,
+  Shield,
+  Wrench,
+  Navigation,
+  FileText,
+  BookOpen,
+  Leaf,
+  FileBarChart,
+  DollarSign,
+  ClipboardList,
+  Settings,
+  User,
+  Map,
+  ShieldCheck
 } from 'lucide-react';
 import Sidebar from '../components/ui/Sidebar';
 import Navbar from '../components/ui/Navbar';
+import OfflineBanner from '../components/OfflineBanner';
 import { useAuth } from '../context/AuthContext';
-import { useTheme } from '../hooks/useTheme';
-import { pageTransition } from '../animations/pageTransitions';
 
-const navItems = [
-  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/vehicles', label: 'Vehicle Registry', icon: Truck },
-  { to: '/trips', label: 'Trip Dispatcher', icon: Waypoints },
-  { to: '/maintenance', label: 'Maintenance', icon: ShieldCheck },
-  { to: '/expenses', label: 'Expense & Fuel', icon: Fuel },
-  { to: '/drivers', label: 'Drivers', icon: Activity },
-  { to: '/analytics', label: 'Analytics', icon: BarChart3 }
+export const ADMIN_NAV_ITEMS = [
+  { to: '/dashboard', label: 'Overview', icon: LayoutDashboard },
+  { to: '/live-map', label: 'Live Map', icon: MapPin },
+  { to: '/vehicles', label: 'Vehicles', icon: Truck },
+  { to: '/drivers', label: 'Drivers', icon: Users },
+  { to: '/trips', label: 'Trips', icon: Waypoints },
+  { to: '/fuel', label: 'Fuel & Cost', icon: Fuel },
+  { to: '/utilisation', label: 'Utilisation', icon: Activity },
+  { to: '/alerts', label: 'Alerts', icon: AlertTriangle },
+  { to: '/forecast', label: 'Forecast', icon: TrendingUp },
+  { to: '/geofencing', label: 'Geofencing', icon: Map },
+  { to: '/maintenance', label: 'Maintenance', icon: Wrench },
+  { to: '/safety', label: 'Safety', icon: Shield },
+  { to: '/routes', label: 'Routes', icon: Navigation },
+  { to: '/documents', label: 'Documents', icon: FileText },
+  { to: '/logbook', label: 'Logbook', icon: BookOpen },
+  { to: '/carbon', label: 'Carbon', icon: Leaf },
+  { to: '/reports', label: 'Reports', icon: FileBarChart },
+  { to: '/salary', label: 'Salary', icon: DollarSign },
+  { to: '/audit-logs', label: 'Audit Logs', icon: ClipboardList },
+  { to: '/settings', label: 'Settings', icon: Settings },
+  { to: '/profile', label: 'Profile', icon: User }
 ];
-
-const navAccess = {
-  '/dashboard': ['Fleet Manager', 'Dispatcher', 'Safety Officer', 'Financial Analyst'],
-  '/vehicles': ['Fleet Manager', 'Dispatcher', 'Safety Officer', 'Financial Analyst'],
-  '/trips': ['Fleet Manager', 'Dispatcher', 'Safety Officer', 'Financial Analyst'],
-  '/maintenance': ['Fleet Manager', 'Safety Officer', 'Financial Analyst'],
-  '/expenses': ['Fleet Manager', 'Financial Analyst'],
-  '/drivers': ['Fleet Manager', 'Dispatcher', 'Safety Officer', 'Financial Analyst'],
-  '/analytics': ['Fleet Manager', 'Financial Analyst']
-};
 
 const AppLayout = () => {
   const location = useLocation();
   const { user, logout } = useAuth();
-  const { isDark, toggleTheme } = useTheme();
   const [collapsed, setCollapsed] = useState(false);
-  const allowedNavItems = navItems.filter((item) => navAccess[item.to]?.includes(user?.role));
+
+  // If driver tries to access admin layout, redirect to driver PWA dashboard
+  if (user && user.role === 'Driver') {
+    return <Navigate to="/driver/dashboard" replace />;
+  }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-[#f7ead6] via-[#e0c39b] to-[#c89f70] px-4 py-5 transition-colors duration-300 dark:from-[#040913] dark:via-[#071227] dark:to-[#0c1d37]">
-      <div className="pointer-events-none absolute -top-24 left-1/3 h-72 w-72 rounded-full bg-fleet-tan/45 blur-3xl dark:bg-fleet-oxford/45" />
-      <div className="pointer-events-none absolute bottom-0 right-0 h-80 w-80 rounded-full bg-fleet-oxford/25 blur-3xl dark:bg-fleet-tanVivid/20" />
+    <div className="relative min-h-screen overflow-x-hidden bg-slate-950 text-slate-100 selection:bg-amber-500 selection:text-slate-950 font-sans flex">
+      <OfflineBanner />
+      
+      {/* Background Decorative Glows */}
+      <div className="pointer-events-none fixed -top-40 -left-40 h-96 w-96 rounded-full bg-amber-500/10 blur-[120px]" />
+      <div className="pointer-events-none fixed top-1/2 -right-40 h-96 w-96 rounded-full bg-indigo-500/10 blur-[120px]" />
 
-      <div className="relative mx-auto grid max-w-[1500px] grid-cols-1 gap-4 lg:grid-cols-[auto_1fr]">
-        <Sidebar items={allowedNavItems} collapsed={collapsed} onToggle={() => setCollapsed((prev) => !prev)} />
+      {/* Docked Left Sidebar */}
+      <Sidebar items={ADMIN_NAV_ITEMS} collapsed={collapsed} onToggle={() => setCollapsed((prev) => !prev)} />
 
-        <section className="space-y-6">
-          <Navbar role={user?.role || 'User'} isDark={isDark} onToggleTheme={toggleTheme} onLogout={logout} />
-          <AnimatePresence mode="wait">
-            <motion.main
-              key={location.pathname}
-              initial={pageTransition.initial}
-              animate={pageTransition.animate}
-              exit={pageTransition.exit}
-              transition={pageTransition.transition}
-              className="space-y-4"
-            >
-              <Outlet />
-            </motion.main>
-          </AnimatePresence>
-        </section>
-      </div>
+      {/* Full-width Main Content Area */}
+      <section className="flex-1 flex flex-col min-w-0 px-4 py-3 md:px-6 md:py-4 space-y-4">
+        <Navbar role={user?.role || 'Super Admin'} onLogout={logout} />
+        <AnimatePresence mode="wait">
+          <motion.main
+            key={location.pathname}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.18 }}
+            className="flex-1 min-w-0"
+          >
+            <Outlet />
+          </motion.main>
+        </AnimatePresence>
+      </section>
     </div>
   );
 };

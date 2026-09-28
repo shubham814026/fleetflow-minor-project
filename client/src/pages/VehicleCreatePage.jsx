@@ -1,112 +1,131 @@
-import { useState } from 'react';
-import { motion } from 'framer-motion';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '../services/api';
-import { useToast } from '../context/ToastContext';
-import Button from '../components/ui/Button';
-import Card from '../components/ui/Card';
-import FloatingInput from '../components/ui/FloatingInput';
-import FloatingSelect from '../components/ui/FloatingSelect';
+import { Truck, ArrowLeft } from 'lucide-react';
+import { vehicleApi } from '../api';
 
-const initialForm = {
-  model: '',
-  type: '',
-  licensePlate: '',
-  maxLoadCapacity: '',
-  acquisitionCost: '',
-  odometer: ''
+const getOneYearFromNow = () => {
+  const d = new Date();
+  d.setFullYear(d.getFullYear() + 1);
+  return d.toISOString().split('T')[0];
 };
 
-const VehicleCreatePage = () => {
+export default function VehicleCreatePage() {
   const navigate = useNavigate();
-  const toast = useToast();
-  const [form, setForm] = useState(initialForm);
-  const [formError, setFormError] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+  const [form, setForm] = useState({
+    registration: '',
+    makeModel: '',
+    type: 'Heavy Truck',
+    fuelLevel: 100,
+    odometer: 0,
+    status: 'idle',
+    speed: 0,
+    insuranceExpiry: getOneYearFromNow(),
+    pucExpiry: getOneYearFromNow()
+  });
+  const [loading, setLoading] = useState(false);
 
-  const handleCreate = async (event) => {
-    event.preventDefault();
-    if (!form.model || !form.licensePlate || !form.maxLoadCapacity || !form.odometer) {
-      setFormError('Please complete required fields.');
-      return;
-    }
-
-    setSubmitting(true);
-    setFormError('');
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
     try {
-      const payload = {
-        model: form.model,
-        licensePlate: form.licensePlate,
-        maxLoadCapacity: Number(form.maxLoadCapacity),
-        acquisitionCost: Number(form.acquisitionCost || 0),
-        odometer: Number(form.odometer)
-      };
-
-      if (form.type) {
-        payload.type = form.type;
-      }
-
-      await api.post('/vehicles', {
-        ...payload
-      });
-      toast.success('Vehicle created');
-      setForm(initialForm);
+      await vehicleApi.create(form);
       navigate('/vehicles');
-    } catch (error) {
-      toast.error(error?.response?.data?.message || 'Failed to create vehicle');
+    } catch (err) {
+      console.error(err);
     } finally {
-      setSubmitting(false);
+      setLoading(false);
     }
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="section-title">Add Vehicle</h1>
-          <p className="section-subtitle">Create a new fleet vehicle record</p>
-        </div>
-        <Button variant="secondary" onClick={() => navigate('/vehicles')}>
-          Back to Vehicles
-        </Button>
-      </div>
+    <div className="space-y-6 max-w-2xl">
+      <button onClick={() => navigate('/vehicles')} className="text-xs text-slate-400 hover:text-white flex items-center gap-1 font-semibold">
+        <ArrowLeft className="w-4 h-4" /> Back to Vehicles
+      </button>
 
-      <Card>
-        <form onSubmit={handleCreate} className="grid gap-3 md:grid-cols-3">
-          <FloatingInput label="Model" value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} />
-          <FloatingSelect
-            label="Type"
-            placeholder="Select Type (optional)"
-            value={form.type}
-            onChange={(e) => setForm({ ...form, type: e.target.value })}
-          >
-            <option>Truck</option>
-            <option>Van</option>
-            <option>Pickup</option>
-            <option>Trailer</option>
-            <option>Reefer</option>
-            <option>Other</option>
-          </FloatingSelect>
-          <FloatingInput label="License Plate" value={form.licensePlate} onChange={(e) => setForm({ ...form, licensePlate: e.target.value })} />
-          <FloatingInput type="number" min="1" label="Max Load Capacity" value={form.maxLoadCapacity} onChange={(e) => setForm({ ...form, maxLoadCapacity: e.target.value })} />
-          <FloatingInput type="number" min="0" label="Acquisition Cost" value={form.acquisitionCost} onChange={(e) => setForm({ ...form, acquisitionCost: e.target.value })} />
-          <FloatingInput type="number" min="0" label="Odometer" value={form.odometer} onChange={(e) => setForm({ ...form, odometer: e.target.value })} />
-          <div className="md:col-span-3 flex items-center justify-between">
-            {formError ? (
-              <motion.p initial={{ x: -8 }} animate={{ x: [0, -6, 6, -4, 4, 0] }} className="text-xs text-rose-500">
-                {formError}
-              </motion.p>
-            ) : (
-              <span className="text-xs text-slate-500 dark:text-slate-400">Records sync instantly with backend APIs.</span>
-            )}
-            <Button type="submit" disabled={submitting}>
-              {submitting ? 'Adding...' : 'Add Vehicle'}
-            </Button>
+      <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl space-y-4">
+        <h1 className="text-xl font-black text-slate-100 flex items-center gap-2">
+          <Truck className="w-6 h-6 text-amber-400" /> Register New Fleet Vehicle
+        </h1>
+
+        <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+          <div>
+            <label className="block text-slate-300 mb-1">Registration Number</label>
+            <input
+              type="text"
+              required
+              placeholder="e.g. KA-01-EQ-9042"
+              value={form.registration}
+              onChange={(e) => setForm({ ...form, registration: e.target.value })}
+              className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-slate-100"
+            />
           </div>
+
+          <div>
+            <label className="block text-slate-300 mb-1">Make & Model</label>
+            <input
+              type="text"
+              required
+              placeholder="e.g. Tata Prima 4928.S"
+              value={form.makeModel}
+              onChange={(e) => setForm({ ...form, makeModel: e.target.value })}
+              className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-slate-100"
+            />
+          </div>
+
+          <div>
+            <label className="block text-slate-300 mb-1">Vehicle Type</label>
+            <select
+              value={form.type}
+              onChange={(e) => setForm({ ...form, type: e.target.value })}
+              className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-slate-100"
+            >
+              <option value="Heavy Truck">Heavy Truck</option>
+              <option value="Container Truck">Container Truck</option>
+              <option value="Medium Duty Truck">Medium Duty Truck</option>
+              <option value="Trailer">Trailer</option>
+            </select>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-slate-300 mb-1 flex items-center justify-between">
+                <span>Insurance Expiry</span>
+                <span className="text-[10px] text-amber-400 font-semibold">+1 Year Default</span>
+              </label>
+              <input
+                type="date"
+                required
+                value={form.insuranceExpiry}
+                onChange={(e) => setForm({ ...form, insuranceExpiry: e.target.value })}
+                className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-slate-100"
+              />
+            </div>
+
+            <div>
+              <label className="block text-slate-300 mb-1 flex items-center justify-between">
+                <span>PUC Expiry</span>
+                <span className="text-[10px] text-amber-400 font-semibold">+1 Year Default</span>
+              </label>
+              <input
+                type="date"
+                required
+                value={form.pucExpiry}
+                onChange={(e) => setForm({ ...form, pucExpiry: e.target.value })}
+                className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-slate-100"
+              />
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs transition-all shadow-lg shadow-amber-500/20"
+          >
+            {loading ? 'Creating...' : 'Submit Vehicle Registration'}
+          </button>
         </form>
-      </Card>
+      </div>
     </div>
   );
-};
-
-export default VehicleCreatePage;
+}

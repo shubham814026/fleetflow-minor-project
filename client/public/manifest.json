@@ -1,0 +1,16 @@
+{
+  "short_name": "SmartFleet PWA",
+  "name": "SmartFleet AI - Driver & Fleet Mobile Portal",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192 512x512"
+    }
+  ],
+  "start_url": "/driver/dashboard",
+  "background_color": "#020617",
+  "theme_color": "#f59e0b",
+  "display": "standalone",
+  "orientation": "portrait"
+}

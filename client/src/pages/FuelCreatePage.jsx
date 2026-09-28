@@ -27,8 +27,12 @@ const FuelCreatePage = () => {
     const fetchVehicles = async () => {
       setLoading(true);
       try {
-        const { data } = await api.get('/vehicles');
-        setVehicles(data);
+        const res = await api.get('/vehicles');
+        const list = Array.isArray(res.data) ? res.data : Array.isArray(res.data?.data) ? res.data.data : [];
+        setVehicles(list);
+        if (list.length > 0) {
+          setForm((prev) => ({ ...prev, vehicle: list[0].id || list[0].registration || list[0].registrationNumber }));
+        }
       } catch (error) {
         toast.error(error?.response?.data?.message || 'Failed to load vehicles');
       } finally {
@@ -43,15 +47,20 @@ const FuelCreatePage = () => {
     event.preventDefault();
     setSubmitting(true);
     try {
+      const selectedVeh = vehicles.find(
+        (v) => v.id === form.vehicle || v.registration === form.vehicle || v.registrationNumber === form.vehicle
+      );
+
       await api.post('/fuel', {
-        ...form,
-        liters: Number(form.liters),
+        vehicleId: selectedVeh?.id || form.vehicle,
+        vehicleReg: selectedVeh?.registration || selectedVeh?.registrationNumber || form.vehicle,
+        litres: Number(form.liters),
         cost: Number(form.cost),
-        date: new Date(form.date)
+        date: form.date ? new Date(form.date).toISOString() : new Date().toISOString()
       });
-      toast.success('Fuel log added');
+      toast.success('Fuel log added successfully');
       setForm(initialForm);
-      navigate('/expenses');
+      navigate('/fuel');
     } catch (error) {
       toast.error(error?.response?.data?.message || 'Failed to add fuel log');
     } finally {
@@ -66,8 +75,8 @@ const FuelCreatePage = () => {
           <h1 className="section-title">Add Fuel Record</h1>
           <p className="section-subtitle">Create a fuel expense entry</p>
         </div>
-        <Button variant="secondary" onClick={() => navigate('/expenses')}>
-          Back to Expenses
+        <Button variant="secondary" onClick={() => navigate('/fuel')}>
+          Back to Fuel Hub
         </Button>
       </div>
 
@@ -78,9 +87,9 @@ const FuelCreatePage = () => {
           <form onSubmit={createFuelLog} className="grid gap-3 md:grid-cols-4">
             <FloatingSelect label="Vehicle" value={form.vehicle} onChange={(e) => setForm({ ...form, vehicle: e.target.value })} required>
               <option value="">Select Vehicle</option>
-              {vehicles.map((vehicle) => (
-                <option key={vehicle._id} value={vehicle._id}>
-                  {vehicle.model} ({vehicle.licensePlate})
+              {vehicles.map((v) => (
+                <option key={v.id || v._id} value={v.id || v.registration || v.registrationNumber}>
+                  {v.registration || v.registrationNumber} - {v.makeModel || v.model || 'Truck'}
                 </option>
               ))}
             </FloatingSelect>
@@ -88,7 +97,7 @@ const FuelCreatePage = () => {
             <FloatingInput type="number" min="0" step="0.01" label="Cost" value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} required />
             <FloatingInput type="date" label="Date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
             <div className="md:col-span-4 flex justify-end">
-              <Button disabled={submitting}>{submitting ? 'Adding...' : 'Add Fuel Record'}</Button>
+              <Button type="submit" disabled={submitting}>{submitting ? 'Adding...' : 'Add Fuel Record'}</Button>
             </div>
           </form>
         </Card>

@@ -14,12 +14,16 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('fleetflow_auth', JSON.stringify(auth));
   }, [auth]);
 
-  const login = async (email, password) => {
+  const login = async (email, password, role) => {
     setLoading(true);
     try {
-      const { data } = await api.post('/auth/login', { email, password });
-      setAuth({ token: data.token, user: data.user });
-      return data.user;
+      const { data } = await api.post('/auth/login', { email, password, role });
+      const payload = data?.data || data;
+      if (!payload || !payload.user) {
+        throw new Error(data?.error?.message || 'Login failed');
+      }
+      setAuth({ token: payload.token, user: payload.user });
+      return payload.user;
     } finally {
       setLoading(false);
     }

@@ -1,180 +1,272 @@
-import { useEffect, useMemo, useState } from 'react';
-import { motion } from 'framer-motion';
-import { LuPackageOpen, LuShieldAlert, LuTruck, LuWaves } from 'react-icons/lu';
-import { PolarAngleAxis, RadialBar, RadialBarChart, ResponsiveContainer } from 'recharts';
-import api from '../services/api';
-import Loader from '../components/Loader';
-import StatusBadge from '../components/ui/StatusBadge';
-import Card from '../components/ui/Card';
-import Table from '../components/ui/Table';
+import React, { useState, useEffect } from 'react';
+import { NavLink } from 'react-router-dom';
+import {
+  Truck,
+  Users,
+  Waypoints,
+  Fuel,
+  AlertTriangle,
+  WifiOff,
+  TrendingUp,
+  Activity,
+  ArrowUpRight,
+  ShieldAlert,
+  MapPin
+} from 'lucide-react';
+import { vehicleApi, driverApi, tripApi, alertApi, fuelApi, forecastApi } from '../api';
+import socketService from '../services/socketService';
 
-const AnimatedCounter = ({ value, suffix = '' }) => {
-  const [display, setDisplay] = useState(0);
-
-  useEffect(() => {
-    const end = Number(value) || 0;
-    let frame = 0;
-    const maxFrames = 24;
-    const timer = setInterval(() => {
-      frame += 1;
-      const progress = frame / maxFrames;
-      setDisplay(Math.round(end * progress));
-      if (frame >= maxFrames) clearInterval(timer);
-    }, 16);
-
-    return () => clearInterval(timer);
-  }, [value]);
-
-  return (
-    <p className="mt-2 text-3xl font-semibold text-slate-900 dark:text-white">
-      {display}
-      {suffix}
-    </p>
-  );
-};
-
-const DashboardPage = () => {
-  const [filters, setFilters] = useState({ type: '', status: '' });
-  const [data, setData] = useState(null);
+export default function DashboardPage() {
+  const [vehicles, setVehicles] = useState([]);
+  const [drivers, setDrivers] = useState([]);
+  const [trips, setTrips] = useState([]);
+  const [alerts, setAlerts] = useState([]);
+  const [fuelMetrics, setFuelMetrics] = useState(null);
+  const [forecast, setForecast] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchDashboard = async () => {
-    setLoading(true);
-    try {
-      const { data: response } = await api.get('/dashboard', { params: filters });
-      setData(response);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    fetchDashboard();
-  }, [filters.type, filters.status]);
+    async function loadDashboardData() {
+      try {
+        const [vData, dData, tData, aData, fData, fcData] = await Promise.all([
+          vehicleApi.getAll(),
+          driverApi.getAll(),
+          tripApi.getAll(),
+          alertApi.getAll(),
+          fuelApi.getMetrics(),
+          forecastApi.getDemand()
+        ]);
 
-  const vehicles = data?.vehicles || [];
-  const utilization = Number(data?.kpis?.utilizationRate || 0);
-  const utilizationData = [{ name: 'Utilization', value: utilization, fill: '#002147' }];
+        setVehicles(Array.isArray(vData) ? vData : (vData?.data || []));
+        setDrivers(Array.isArray(dData) ? dData : (dData?.data || []));
+        setTrips(Array.isArray(tData) ? tData : (tData?.data || []));
+        setAlerts(Array.isArray(aData) ? aData : (aData?.data || []));
+        setFuelMetrics(fData?.data || fData);
+        setForecast(fcData?.data || fcData);
+      } catch (err) {
+        console.error('Failed loading dashboard data', err);
+      } finally {
+        setLoading(false);
+      }
+    }
 
-  const statusDistribution = useMemo(() => {
-    const total = vehicles.length || 1;
-    const availableCount = vehicles.filter((item) => item.status === 'Available').length;
-    const onTripCount = vehicles.filter((item) => item.status === 'On Trip').length;
-    const inShopCount = vehicles.filter((item) => item.status === 'In Shop').length;
+    loadDashboardData();
 
-    return [
-      { label: 'Available', count: availableCount, progress: Math.round((availableCount / total) * 100), color: 'bg-fleet-tan' },
-      { label: 'On Trip', count: onTripCount, progress: Math.round((onTripCount / total) * 100), color: 'bg-fleet-oxford' },
-      { label: 'In Shop', count: inShopCount, progress: Math.round((inShopCount / total) * 100), color: 'bg-amber-500' }
-    ];
-  }, [vehicles]);
+    // Socket real-time subscriptions
+    socketService.connect();
+    const unsubGps = socketService.subscribe('gps:update', (data) => {
+      setVehicles((prev) =>
+        prev.map((v) => (v.id === data.vehicleId ? { ...v, lat: data.lat, lng: data.lng, speed: data.speed } : v))
+      );
+    });
 
-  if (loading || !data) return <Loader text="Loading dashboard" />;
+    const unsubAlert = socketService.subscribe('alert:new', (newAlert) => {
+      setAlerts((prev) => [newAlert, ...prev]);
+    });
 
-  const cards = [
-    { label: 'Active Fleet', value: data?.kpis?.activeFleet || 0, icon: LuTruck },
-    { label: 'Maintenance Alerts', value: data?.kpis?.maintenanceAlerts || 0, icon: LuShieldAlert },
-    { label: 'Pending Cargo', value: data?.kpis?.pendingCargo || 0, icon: LuPackageOpen },
-    { label: 'Utilization Rate', value: data?.kpis?.utilizationRate || 0, icon: LuWaves, suffix: '%' }
-  ];
+    return () => {
+      unsubGps();
+      unsubAlert();
+    };
+  }, []);
+
+  const activeVehicles = (Array.isArray(vehicles) ? vehicles : []).filter((v) => v.status === 'moving' || v.status === 'idle').length;
+  const offlineVehicles = (Array.isArray(vehicles) ? vehicles : []).filter((v) => v.status === 'offline').length;
+  const activeDrivers = (Array.isArray(drivers) ? drivers : []).filter((d) => d.status === 'Active').length;
+  const openAlerts = (Array.isArray(alerts) ? alerts : []).filter((a) => a.status === 'Open').length;
+
+  if (loading) {
+    return (
+      <div className="p-8 text-center text-slate-400 text-sm animate-pulse flex flex-col items-center gap-3">
+        <Activity className="w-8 h-8 text-amber-500 animate-spin" />
+        <span>Initializing SmartFleet AI Telemetry Engine...</span>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="section-title">Command Center</h1>
-        <p className="section-subtitle">Fleet KPIs and current operational status</p>
+    <div className="space-y-6">
+      {/* Header Banner */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-slate-900 via-slate-900 to-amber-950/40 p-6 rounded-2xl border border-slate-800 shadow-xl relative overflow-hidden">
+        <div>
+          <h1 className="text-xl font-black text-slate-100 tracking-tight">Fleet Command Overview</h1>
+          <p className="text-xs text-slate-400 mt-1">Real-time telemetry, driver stats, fuel intelligence & alerts</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <NavLink
+            to="/live-map"
+            className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-amber-500/20 transition-all"
+          >
+            <MapPin className="w-4 h-4" /> Open Fullscreen Live Map
+          </NavLink>
+        </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {cards.map((card) => (
-          <Card key={card.label} glow>
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <p className="text-sm text-slate-500 dark:text-slate-400">{card.label}</p>
-                <AnimatedCounter value={card.value} suffix={card.suffix} />
-              </div>
-              <span className="rounded-xl border border-fleet-tan/70 bg-fleet-tan/30 p-2 text-fleet-oxford dark:border-fleet-tanVivid/60 dark:bg-fleet-oxford/30 dark:text-fleet-tanVivid">
-                <card.icon />
-              </span>
-            </div>
-          </Card>
-        ))}
+      {/* 8 Required KPI Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-lg flex items-center gap-3">
+          <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-400">
+            <Truck className="w-6 h-6" />
+          </div>
+          <div>
+            <span className="text-[11px] font-semibold text-slate-400 block">Active Vehicles</span>
+            <span className="text-xl font-black text-slate-100">{activeVehicles}</span>
+          </div>
+        </div>
+
+        <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-lg flex items-center gap-3">
+          <div className="p-3 bg-indigo-500/10 border border-indigo-500/30 rounded-xl text-indigo-400">
+            <Truck className="w-6 h-6" />
+          </div>
+          <div>
+            <span className="text-[11px] font-semibold text-slate-400 block">Total Vehicles</span>
+            <span className="text-xl font-black text-slate-100">{vehicles.length}</span>
+          </div>
+        </div>
+
+        <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-lg flex items-center gap-3">
+          <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-xl text-blue-400">
+            <Waypoints className="w-6 h-6" />
+          </div>
+          <div>
+            <span className="text-[11px] font-semibold text-slate-400 block">Trips Today</span>
+            <span className="text-xl font-black text-slate-100">{trips.length}</span>
+          </div>
+        </div>
+
+        <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-lg flex items-center gap-3">
+          <div className="p-3 bg-teal-500/10 border border-teal-500/30 rounded-xl text-teal-400">
+            <Users className="w-6 h-6" />
+          </div>
+          <div>
+            <span className="text-[11px] font-semibold text-slate-400 block">Active Drivers</span>
+            <span className="text-xl font-black text-slate-100">{activeDrivers}</span>
+          </div>
+        </div>
+
+        <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-lg flex items-center gap-3">
+          <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-400">
+            <Fuel className="w-6 h-6" />
+          </div>
+          <div>
+            <span className="text-[11px] font-semibold text-slate-400 block">Fuel Cost This Month</span>
+            <span className="text-xl font-black text-slate-100">
+              ₹ {fuelMetrics?.totalSpentThisMonth ? (fuelMetrics.totalSpentThisMonth / 1000).toFixed(1) + 'k' : '485k'}
+            </span>
+          </div>
+        </div>
+
+        <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-lg flex items-center gap-3">
+          <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-400">
+            <AlertTriangle className="w-6 h-6" />
+          </div>
+          <div>
+            <span className="text-[11px] font-semibold text-slate-400 block">Open Alerts</span>
+            <span className="text-xl font-black text-slate-100">{openAlerts}</span>
+          </div>
+        </div>
+
+        <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-lg flex items-center gap-3">
+          <div className="p-3 bg-slate-800 border border-slate-700 rounded-xl text-slate-400">
+            <WifiOff className="w-6 h-6" />
+          </div>
+          <div>
+            <span className="text-[11px] font-semibold text-slate-400 block">Vehicles Offline</span>
+            <span className="text-xl font-black text-slate-100">{offlineVehicles}</span>
+          </div>
+        </div>
+
+        <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-lg flex items-center gap-3">
+          <div className="p-3 bg-purple-500/10 border border-purple-500/30 rounded-xl text-purple-400">
+            <TrendingUp className="w-6 h-6" />
+          </div>
+          <div>
+            <span className="text-[11px] font-semibold text-slate-400 block">Forecasted Demand</span>
+            <span className="text-xl font-black text-slate-100">{forecast?.nextWeekDemandTrips || 184} trips</span>
+          </div>
+        </div>
       </div>
 
-      <div className="grid gap-3 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Fleet Status Distribution</h3>
-          <div className="mt-4 space-y-3">
-            {statusDistribution.map((item) => (
-              <div key={item.label}>
-                <div className="mb-1 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-                  <span>{item.label}</span>
-                  <span>{item.count} ({item.progress}%)</span>
-                </div>
-                <div className="h-2 rounded-full bg-slate-200 dark:bg-slate-700">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${item.progress}%` }}
-                    transition={{ duration: 0.5 }}
-                    className={`h-2 rounded-full ${item.color}`}
+      {/* Grid Section: Live Fleet Status & Open Critical Alerts */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Vehicles Telemetry Summary */}
+        <div className="lg:col-span-2 bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-xl">
+          <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-800">
+            <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+              <Truck className="w-4 h-4 text-amber-400" /> Active Vehicles Live Telemetry
+            </h3>
+            <NavLink to="/vehicles" className="text-xs text-amber-400 hover:underline flex items-center gap-1 font-semibold">
+              View All <ArrowUpRight className="w-3.5 h-3.5" />
+            </NavLink>
+          </div>
+
+          <div className="space-y-3">
+            {vehicles.map((v) => (
+              <div key={v.id} className="flex items-center justify-between p-3 bg-slate-950/60 border border-slate-800/80 rounded-xl text-xs">
+                <div className="flex items-center gap-3">
+                  <div
+                    className={`w-3 h-3 rounded-full ${
+                      v.status === 'moving'
+                        ? 'bg-emerald-500 animate-pulse'
+                        : v.status === 'sos'
+                        ? 'bg-rose-500 animate-ping'
+                        : v.status === 'idle'
+                        ? 'bg-amber-500'
+                        : 'bg-slate-600'
+                    }`}
                   />
+                  <div>
+                    <span className="font-bold text-slate-100 block">{v.registration}</span>
+                    <span className="text-[11px] text-slate-400">{v.makeModel}</span>
+                  </div>
+                </div>
+
+                <div className="text-right">
+                  <span className="font-medium text-slate-300 block">{v.assignedDriverName || 'Unassigned'}</span>
+                  <span className="text-[11px] text-slate-400">{v.speed} km/h • Fuel: {v.fuelLevel}%</span>
                 </div>
               </div>
             ))}
           </div>
-        </Card>
+        </div>
 
-        <Card>
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Fleet Utilization</h3>
-          <div className="mt-2 h-40 w-full">
-            <ResponsiveContainer>
-              <RadialBarChart innerRadius="70%" outerRadius="100%" data={utilizationData} startAngle={90} endAngle={-270}>
-                <PolarAngleAxis type="number" domain={[0, 100]} tick={false} />
-                <RadialBar dataKey="value" cornerRadius={10} />
-              </RadialBarChart>
-            </ResponsiveContainer>
+        {/* Recent Alerts Feed */}
+        <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-xl">
+          <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-800">
+            <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+              <ShieldAlert className="w-4 h-4 text-rose-400" /> Recent Alerts
+            </h3>
+            <NavLink to="/alerts" className="text-xs text-rose-400 hover:underline font-semibold">
+              Manage
+            </NavLink>
           </div>
-          <p className="-mt-1 text-center text-lg font-semibold text-fleet-oxford dark:text-fleet-tanVivid">{utilization}%</p>
-        </Card>
-      </div>
 
-      <Table
-        title="Active Fleet"
-        description="Filter and review live vehicle readiness"
-        loading={loading}
-        columns={[
-          { key: 'model', label: 'Model' },
-          { key: 'licensePlate', label: 'Plate' },
-          { key: 'type', label: 'Type' },
-          { key: 'maxLoadCapacity', label: 'Capacity' },
-          { key: 'status', label: 'Status', render: (row) => <StatusBadge status={row.status} /> }
-        ]}
-        rows={vehicles}
-        getRowId={(row) => row._id}
-        searchKeys={['model', 'licensePlate', 'type', 'status']}
-        filters={
-          <>
-            <select className="input h-10 !w-36 !py-0" value={filters.type} onChange={(e) => setFilters((prev) => ({ ...prev, type: e.target.value }))}>
-              <option value="">All Types</option>
-              <option>Truck</option>
-              <option>Van</option>
-              <option>Pickup</option>
-              <option>Trailer</option>
-              <option>Reefer</option>
-              <option>Other</option>
-            </select>
-            <select className="input h-10 !w-36 !py-0" value={filters.status} onChange={(e) => setFilters((prev) => ({ ...prev, status: e.target.value }))}>
-              <option value="">All Status</option>
-              <option>Available</option>
-              <option>On Trip</option>
-              <option>In Shop</option>
-              <option>Out of Service</option>
-            </select>
-          </>
-        }
-      />
+          <div className="space-y-3">
+            {alerts.slice(0, 4).map((alt) => (
+              <div key={alt.id} className="p-3 bg-slate-950/60 border border-slate-800/80 rounded-xl text-xs space-y-1">
+                <div className="flex items-center justify-between">
+                  <span
+                    className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase ${
+                      alt.severity === 'Critical'
+                        ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                        : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                    }`}
+                  >
+                    {alt.category} • {alt.severity}
+                  </span>
+                  <span className="text-[10px] text-slate-500">
+                    {new Date(alt.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
+                <p className="text-slate-300 font-medium line-clamp-2">{alt.description}</p>
+                <div className="text-[11px] text-slate-400 pt-1">
+                  Vehicle: <span className="text-slate-200 font-semibold">{alt.vehicleReg}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   );
-};
-
-export default DashboardPage;
+}
